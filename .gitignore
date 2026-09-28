@@ -1,0 +1,12 @@
+# Local learning progress and Python environments
+.data/
+.venv/
+.venv-windows/
+.venv-old-*/
+.venv-windows-old-*/
+__pycache__/
+*.py[cod]
+.DS_Store
+.env
+.env.*
+*.log

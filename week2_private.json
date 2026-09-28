@@ -1,0 +1,989 @@
+{
+  "id": 2,
+  "title": "从数据到预测",
+  "description": "训练、评价与改进模型。完成第一个分类项目。",
+  "days": [
+    {
+      "short": "特征与标签",
+      "tag": "Data",
+      "title": "让数据变成学习材料",
+      "description": "用熟悉的表格，认识机器学习的输入与答案。",
+      "question": "模型能看到什么？它需要预测什么？",
+      "concept": "<p>分类任务让模型根据输入，判断样本属于哪个类别。今天的 Iris（鸢尾花）数据包含 150 朵花，每朵花有 4 个测量值，用来预测 3 个品种之一。</p><ul><li><strong>样本：</strong>一朵花，对应表格的一行。</li><li><strong>特征 X：</strong>花萼长宽、花瓣长宽，共 4 列；是预测时允许模型看到的信息。</li><li><strong>标签 y：</strong>已知品种，用整数 0、1、2 表示；这些数字是类别编号，不表示高低。</li></ul><p>load_iris 是安装包自带的数据，无需联网。as_frame=True 表示尽量以 Pandas 表格和 Series 返回。不能把答案 y 塞进 X，这会把“已知答案”错误地当成预测线索。</p>",
+      "tasks": [
+        {
+          "id": "w2d1_1",
+          "short": "读取数据",
+          "title": "拆开输入 X 和答案 y",
+          "description": "<p>读取内置 Iris 数据，保留 Pandas 类型。</p>",
+          "requirements": [
+            "创建 <code>iris</code>、<code>X</code>、<code>y</code>。",
+            "X 为 150 行、4 列，y 为 150 个标签。",
+            "打印 X 和 y 的前 3 行。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\n# iris = ...\n# X = ...\n# y = ...\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\nprint(X.head(3))\nprint(y.head(3))\n",
+          "hints": [
+            "使用 <code>load_iris(as_frame=True)</code>。",
+            "<code>iris.data</code> 是特征表，<code>iris.target</code> 是标签。"
+          ],
+          "checks": [
+            {
+              "name": "特征表正确",
+              "code": "from sklearn.datasets import load_iris\ne=load_iris(as_frame=True); pd.testing.assert_frame_equal(X,e.data)",
+              "message": "用 iris.data 获取四个测量特征，不能加入 target。"
+            },
+            {
+              "name": "标签正确",
+              "code": "from sklearn.datasets import load_iris\npd.testing.assert_series_equal(y,load_iris(as_frame=True).target)",
+              "message": "用 iris.target 获取标签 Series。"
+            }
+          ],
+          "explain": {
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "print(X.head(3))": "X.head(3) 取特征表的前 3 行，print 显示这张小表。能看到四个特征名称、原始行号以及每朵花的测量值。",
+            "print(y.head(3))": "y.head(3) 取前 3 个真实类别。左边是行索引，右边是标签；这三个样本都是编号 0。"
+          }
+        },
+        {
+          "id": "w2d1_2",
+          "short": "类别计数",
+          "title": "看看三种花各有多少",
+          "description": "<p>数据已准备好，理解类别编号与名称的关系。</p>",
+          "requirements": [
+            "用 <code>class_counts</code> 保存按编号 0、1、2 排序的数量 Series。",
+            "用列表 <code>class_names</code> 保存三个类别名称，顺序与编号一致。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\n# class_counts = ...\n# class_names = ...\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\nclass_counts = y.value_counts().sort_index()\nclass_names = iris.target_names.tolist()\nprint(class_counts)\nprint(class_names)\n",
+          "hints": [
+            "<code>value_counts()</code> 统计各个值出现的次数。",
+            "用 <code>sort_index()</code> 按类别编号排序；名称在 iris.target_names。"
+          ],
+          "checks": [
+            {
+              "name": "三个类别的数量正确",
+              "code": "from sklearn.datasets import load_iris\ne=load_iris(as_frame=True); pd.testing.assert_series_equal(class_counts,e.target.value_counts().sort_index())",
+              "message": "每类 50 条，按类别编号升序。"
+            },
+            {
+              "name": "类别名称与顺序正确",
+              "code": "assert class_names==[\"setosa\",\"versicolor\",\"virginica\"]",
+              "message": "使用 target_names 转成列表。"
+            }
+          ],
+          "explain": {
+            "class_counts = y.value_counts().sort_index()": "先数每种标签出现多少次，再按标签编号排序。计数结果是 Series，索引是类别，值是数量。",
+            "class_names = iris.target_names.tolist()": "取类别名称数组并转换为列表。列表第 0 项对应标签 0，以此类推。",
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "print(class_counts)": "显示类别编号到样本数量的对应关系。本例三类各 50 条。",
+            "print(class_names)": "显示三个品种名称列表，位置 0、1、2 对应类别编号。"
+          }
+        },
+        {
+          "id": "w2d1_3",
+          "short": "观察分布",
+          "title": "特征真的能区分类别吗？",
+          "description": "<p>用散点图观察花萼长度和花瓣长度。</p>",
+          "requirements": [
+            "创建 <code>fig, ax</code>。",
+            "横轴为 X 第 0 列，纵轴为第 2 列；点的颜色由 y 决定。",
+            "补齐标题和两个轴标签。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nimport matplotlib.pyplot as plt\nfig, ax = plt.subplots()\n# 画散点图并添加标签\nplt.show()\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nimport matplotlib.pyplot as plt\nfig, ax = plt.subplots()\nax.scatter(X.iloc[:, 0], X.iloc[:, 2], c=y, cmap=\"viridis\")\nax.set_xlabel(X.columns[0])\nax.set_ylabel(X.columns[2])\nax.set_title(\"Iris: features and classes\")\nplt.show()\n",
+          "hints": [
+            "iloc 按位置选择，<code>X.iloc[:, 0]</code> 取所有行的第 0 列。",
+            "scatter 的 <code>c=y</code> 根据标签给点着色。"
+          ],
+          "checks": [
+            {
+              "name": "散点的位置与标签颜色正确",
+              "code": "from sklearn.datasets import load_iris\ne=load_iris(as_frame=True); assert len(ax.collections)>0 and np.allclose(ax.collections[0].get_offsets(),e.data.iloc[:,[0,2]]) and np.array_equal(ax.collections[0].get_array(),e.target)",
+              "message": "应有 150 个点，横轴列 0，纵轴列 2，颜色按标签 y。"
+            },
+            {
+              "name": "图表标注完整",
+              "code": "assert ax.get_title() and ax.get_xlabel() and ax.get_ylabel()",
+              "message": "补齐标题和两个轴标签。"
+            }
+          ],
+          "explain": {
+            "ax.scatter(X.iloc[:, 0], X.iloc[:, 2], c=y, cmap=\"viridis\")": "iloc 使用位置索引。前两项给出 x、y 坐标；c=y 把类别映射为颜色，cmap 指定配色。这里画的是已知数据，用于理解；图上分开不代表未见样本一定预测正确。",
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "import matplotlib.pyplot as plt": "导入 matplotlib.pyplot 并使用短名字 plt，供后面的代码调用。",
+            "fig, ax = plt.subplots()": "创建整张图 fig 与一个坐标区域 ax；之后在 ax 上绘制。",
+            "ax.set_xlabel(X.columns[0])": "把第一列完整名称作为横轴标签，包含测量单位。",
+            "ax.set_ylabel(X.columns[2])": "把第三列完整名称作为纵轴标签。",
+            "ax.set_title(\"Iris: features and classes\")": "设置图表标题，说明展示特征与类别的关系。",
+            "plt.show()": "让练习网页在运行结果中显示当前图表。"
+          }
+        }
+      ]
+    },
+    {
+      "short": "训练与验证",
+      "tag": "Split",
+      "title": "给模型留一场真正的考试",
+      "description": "先划分数据，避免提前看见考试答案。",
+      "question": "训练集、验证集、测试集各负责什么？",
+      "concept": "<p><strong>训练集</strong>用于学习；<strong>验证集</strong>用于比较方法、选择参数；<strong>测试集</strong>在方法确定后用于最后一次评价。本周前三天建模只使用训练集和验证集，测试集留到最终流程理解时再讨论。</p><p>本例先拿出 20% 测试数据：150×20%=30；剩下 120 条称为开发集 X_dev。再从开发集拿出 25% 做验证：120×25%=30。最后训练 90、验证 30、测试 30。</p><p>random_state=42 固定随机划分，方便复现，42 没有神奇含义。stratify=y 表示尽量保持各类别比例；X 与 y 必须一起划分，否则输入和答案可能错位。</p>",
+      "tasks": [
+        {
+          "id": "w2d2_1",
+          "short": "留出测试集",
+          "title": "先封存最后的测试数据",
+          "description": "<p>一次同时划分 X 和 y，保留 20% 为测试集。</p>",
+          "requirements": [
+            "得到 <code>X_dev, X_test, y_dev, y_test</code>。",
+            "设置 test_size=0.2、stratify=y、random_state=42。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n# 在这里划分\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nprint(X_dev.shape, X_test.shape)\n",
+          "hints": [
+            "返回顺序是 X 的两部分，再是 y 的两部分。",
+            "<code>train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)</code>。"
+          ],
+          "checks": [
+            {
+              "name": "开发集和测试集正确配对",
+              "code": "from sklearn.datasets import load_iris\nfrom sklearn.model_selection import train_test_split\ne=load_iris(as_frame=True); a,b,c,d=train_test_split(e.data,e.target,test_size=.2,stratify=e.target,random_state=42)\npd.testing.assert_frame_equal(X_dev,a); pd.testing.assert_frame_equal(X_test,b); pd.testing.assert_series_equal(y_dev,c); pd.testing.assert_series_equal(y_test,d)",
+              "message": "按题目固定参数划分，应为 120/30 条，特征与标签索引对应。"
+            }
+          ],
+          "explain": {
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "print(X_dev.shape, X_test.shape)": "分别打印开发表与测试表的形状，每个形状是 (行数, 特征列数)。Iris 是 (120, 4)、(30, 4)；Wine 是 (142, 13)、(36, 13)。"
+          }
+        },
+        {
+          "id": "w2d2_2",
+          "short": "再留验证集",
+          "title": "把开发集拆成训练与验证",
+          "description": "<p>测试集已划出。只对开发集进行第二次划分。</p>",
+          "requirements": [
+            "得到 <code>X_train, X_val, y_train, y_val</code>。",
+            "对 X_dev、y_dev 设置 test_size=0.25、stratify=y_dev、random_state=42。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\n\n# 从开发集中再划分\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\nprint(X_train.shape, X_val.shape, X_test.shape)\n",
+          "hints": [
+            "验证集是开发集的 25%，不是原始数据的 25%。",
+            "这一次输入应是 X_dev、y_dev，分层依据也应为 y_dev。"
+          ],
+          "checks": [
+            {
+              "name": "训练与验证划分正确",
+              "code": "from sklearn.datasets import load_iris\nfrom sklearn.model_selection import train_test_split\ne=load_iris(as_frame=True); xd,xt,yd,yt=train_test_split(e.data,e.target,test_size=.2,stratify=e.target,random_state=42)\na,b,c,d=train_test_split(xd,yd,test_size=.25,stratify=yd,random_state=42)\npd.testing.assert_frame_equal(X_train,a);pd.testing.assert_frame_equal(X_val,b);pd.testing.assert_series_equal(y_train,c);pd.testing.assert_series_equal(y_val,d)",
+              "message": "训练应有 90 条，验证 30 条，测试仍是原先独立的 30 条。"
+            }
+          ],
+          "explain": {
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "X_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)": "只把开发集再拆分，25% 开发数据用于验证。Iris 最后得到 90 条训练、30 条验证、30 条测试。",
+            "print(X_train.shape, X_val.shape, X_test.shape)": "按训练、验证、测试的顺序显示形状：(90, 4)、(30, 4)、(30, 4)。检查总行数仍为 150，列数未改变。"
+          }
+        },
+        {
+          "id": "w2d2_3",
+          "short": "检查边界",
+          "title": "确认数据没有混在一起",
+          "description": "<p>通过原始行索引确认三部分不重叠。</p>",
+          "requirements": [
+            "用布尔值 <code>no_overlap</code> 表示三组索引两两不相交。",
+            "用布尔值 <code>covers_all</code> 表示三组索引合起来正好覆盖 X 的全部行。",
+            "用 <code>train_counts</code> 保存训练标签的计数并按编号排序。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\n# 检查索引集合与类别数量\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\ntrain_ids = set(X_train.index)\nval_ids = set(X_val.index)\ntest_ids = set(X_test.index)\nno_overlap = train_ids.isdisjoint(val_ids) and train_ids.isdisjoint(test_ids) and val_ids.isdisjoint(test_ids)\ncovers_all = (train_ids | val_ids | test_ids) == set(X.index)\ntrain_counts = y_train.value_counts().sort_index()\nprint(no_overlap, covers_all)\nprint(train_counts)\n",
+          "hints": [
+            "set 保存不重复的索引，isdisjoint 判断是否没有共同元素。",
+            "集合的 <code>|</code> 是并集；三个训练类别应该各有 30 条。"
+          ],
+          "checks": [
+            {
+              "name": "索引检查结果正确",
+              "code": "assert bool(no_overlap) and bool(covers_all) and len(set(X_train.index)&set(X_val.index))==0 and len(set(X_train.index)&set(X_test.index))==0 and len(set(X_val.index)&set(X_test.index))==0",
+              "message": "检查三对交集都为空，且并集等于原数据索引。"
+            },
+            {
+              "name": "训练集类别均衡",
+              "code": "assert train_counts.index.tolist()==[0,1,2] and train_counts.tolist()==[30,30,30]",
+              "message": "训练集每类 30 条。"
+            }
+          ],
+          "explain": {
+            "train_ids = set(X_train.index)": "取训练表原始行索引并转成集合，用来检查样本身份。",
+            "val_ids = set(X_val.index)": "保存验证样本的索引集合。",
+            "test_ids = set(X_test.index)": "保存测试样本的索引集合。",
+            "no_overlap = train_ids.isdisjoint(val_ids) and train_ids.isdisjoint(test_ids) and val_ids.isdisjoint(test_ids)": "分别检查训练/验证、训练/测试、验证/测试三对集合，全部不相交才得到 True。",
+            "covers_all = (train_ids | val_ids | test_ids) == set(X.index)": "把三个集合合并，与原表所有索引比较，检查没有遗漏。",
+            "train_counts = y_train.value_counts().sort_index()": "查看训练集中每个类别有多少条，按类别编号排好。",
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "X_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)": "只把开发集再拆分，25% 开发数据用于验证。Iris 最后得到 90 条训练、30 条验证、30 条测试。",
+            "print(no_overlap, covers_all)": "显示两项检查结果。True True 表示三份数据互不重叠，且合起来覆盖全部原始行。",
+            "print(train_counts)": "显示训练集各个类别的样本数，Iris 此处每类 30 条；用来确认分层划分保留了类别比例。"
+          }
+        }
+      ]
+    },
+    {
+      "short": "训练与预测",
+      "tag": "Model",
+      "title": "训练你的第一个分类器",
+      "description": "先有简单基准，再训练真正使用特征的模型。",
+      "question": "fit 学了什么？predict 需要哪些输入？",
+      "concept": "<p>scikit-learn 的常用流程是“创建模型 → fit(X_train, y_train) → predict(X_val)”。创建时指定方法和参数；fit 接收特征与正确标签；predict 只接收待预测特征。不能把 y_val 当成预测输入。</p><p>DummyClassifier 是基准模型：most_frequent 总猜训练集中最常见的类别，帮助判断新方法是否真的有用。KNN（K 近邻）看一个新样本附近的 k 个训练样本，按邻居标签投票。n_neighbors=3 表示看 3 个邻居。KNN 的 fit 主要保存训练样本，不是训练神经网络。</p><p>今天先使用原始特征；第五天会讲为什么距离模型需要标准化。验证分数高不代表任何新数据都会预测正确。</p>",
+      "tasks": [
+        {
+          "id": "w2d3_1",
+          "short": "建立基准",
+          "title": "总猜一个类别，能有多准？",
+          "description": "<p>训练一个总猜最常见类别的基准模型。</p>",
+          "requirements": [
+            "用 <code>baseline</code> 保存 DummyClassifier，strategy=\"most_frequent\"。",
+            "只在训练集 fit，用 <code>baseline_predictions</code> 保存验证集预测。",
+            "用 <code>baseline_accuracy</code> 保存验证准确率。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nfrom sklearn.dummy import DummyClassifier\nfrom sklearn.metrics import accuracy_score\n# 创建、训练、预测、评价\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nfrom sklearn.dummy import DummyClassifier\nfrom sklearn.metrics import accuracy_score\nbaseline = DummyClassifier(strategy=\"most_frequent\")\nbaseline.fit(X_train, y_train)\nbaseline_predictions = baseline.predict(X_val)\nbaseline_accuracy = accuracy_score(y_val, baseline_predictions)\nprint(baseline_accuracy)\n",
+          "hints": [
+            "fit 使用训练集；predict 使用验证集特征。",
+            "准确率函数第一个参数是真实标签，第二个是预测标签。"
+          ],
+          "checks": [
+            {
+              "name": "基准模型按要求训练",
+              "code": "from sklearn.dummy import DummyClassifier\nassert isinstance(baseline,DummyClassifier) and baseline.strategy==\"most_frequent\" and np.array_equal(baseline.class_prior_,[1/3]*3)",
+              "message": "使用 most_frequent 并在均衡训练集上 fit。"
+            },
+            {
+              "name": "预测与准确率正确",
+              "code": "from sklearn.metrics import accuracy_score\nassert np.array_equal(baseline_predictions,baseline.predict(X_val)) and np.isclose(baseline_accuracy,accuracy_score(y_val,baseline_predictions)) and np.isclose(baseline_accuracy,1/3)",
+              "message": "验证集每类均衡，总猜一个类别准确率为 1/3。"
+            }
+          ],
+          "explain": {
+            "baseline = DummyClassifier(strategy=\"most_frequent\")": "创建总猜最常见类别的基准。strategy 是策略参数，目前尚未学习类别分布。",
+            "baseline.fit(X_train, y_train)": "用训练集学习类别频率；不要在验证或测试标签上 fit。",
+            "baseline_predictions = baseline.predict(X_val)": "对验证样本给出预测，这种基准忽略具体特征。",
+            "baseline_accuracy = accuracy_score(y_val, baseline_predictions)": "把真实标签与预测逐条对比，得到正确比例。",
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "X_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)": "只把开发集再拆分，25% 开发数据用于验证。Iris 最后得到 90 条训练、30 条验证、30 条测试。",
+            "from sklearn.dummy import DummyClassifier": "从 sklearn.dummy 模块导入 DummyClassifier，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.metrics import accuracy_score": "从 sklearn.metrics 模块导入 accuracy_score，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "print(baseline_accuracy)": "显示不看特征、总猜最多类别的基线准确率。这里约为 0.3333，即 1/3，用来比较学习模型有没有改进。"
+          }
+        },
+        {
+          "id": "w2d3_2",
+          "short": "KNN 分类",
+          "title": "让相似的花帮你判断",
+          "description": "<p>用 3 个近邻投票预测花的类别。</p>",
+          "requirements": [
+            "创建 <code>model</code>，类型为 KNeighborsClassifier，n_neighbors=3。",
+            "在训练集 fit，用 <code>predictions</code> 保存验证集预测。",
+            "将准确率保存为 <code>val_accuracy</code>。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nfrom sklearn.neighbors import KNeighborsClassifier\nfrom sklearn.metrics import accuracy_score\n# 在这里完成模型流程\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nfrom sklearn.neighbors import KNeighborsClassifier\n\nmodel = KNeighborsClassifier(n_neighbors=3)\nmodel.fit(X_train, y_train)\npredictions = model.predict(X_val)\n\nfrom sklearn.metrics import accuracy_score\nval_accuracy = accuracy_score(y_val, predictions)\nprint(predictions[:5])\nprint(val_accuracy)\n",
+          "hints": [
+            "创建之后还要调用 model.fit(X_train, y_train)。",
+            "不要把测试集用于今天的比较。"
+          ],
+          "checks": [
+            {
+              "name": "KNN 参数与训练数据正确",
+              "code": "from sklearn.neighbors import KNeighborsClassifier\nassert isinstance(model,KNeighborsClassifier) and model.n_neighbors==3 and np.allclose(model._fit_X,X_train)",
+              "message": "模型应保存训练集的 90 个样本，而不是全量数据。"
+            },
+            {
+              "name": "预测和准确率正确",
+              "code": "from sklearn.metrics import accuracy_score\nassert np.array_equal(predictions,model.predict(X_val)) and len(predictions)==30 and np.isclose(val_accuracy,accuracy_score(y_val,predictions))",
+              "message": "使用验证集特征预测，与 y_val 计算准确率。"
+            }
+          ],
+          "explain": {
+            "val_accuracy = accuracy_score(y_val, predictions)": "评价验证预测的正确比例，只评价、不训练。",
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "X_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)": "只把开发集再拆分，25% 开发数据用于验证。Iris 最后得到 90 条训练、30 条验证、30 条测试。",
+            "from sklearn.neighbors import KNeighborsClassifier": "从 sklearn.neighbors 模块导入 KNeighborsClassifier，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "model = KNeighborsClassifier(n_neighbors=3)": "创建 KNN 分类器，指定看最近的 3 个训练邻居，目前尚未拟合。",
+            "model.fit(X_train, y_train)": "用训练特征和标签拟合模型。若 model 是流水线，会依次训练标准化器和分类器。",
+            "predictions = model.predict(X_val)": "用已训练的模型预测验证特征，只传特征，不传答案。输出的顺序与 X_val 行序相同。",
+            "from sklearn.metrics import accuracy_score": "从 sklearn.metrics 模块导入 accuracy_score，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "print(predictions[:5])": "切片 [:5] 取预测数组的前 5 项并打印，不包含位置 5。这些是验证集当前行序的前五条预测。",
+            "print(val_accuracy)": "显示模型的验证准确率。例如 0.9333 表示约 93.33% 的验证样本分类正确。"
+          }
+        },
+        {
+          "id": "w2d3_3",
+          "short": "检查错例",
+          "title": "找出模型判断错的花",
+          "description": "<p>不仅看总分，还要查看具体错误。</p>",
+          "requirements": [
+            "创建 <code>results</code>，包含 actual、predicted 两列，以 y_val 的索引为索引。",
+            "创建 <code>mistakes</code>，保留实际与预测不相同的行。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nfrom sklearn.neighbors import KNeighborsClassifier\n\nmodel = KNeighborsClassifier(n_neighbors=3)\nmodel.fit(X_train, y_train)\npredictions = model.predict(X_val)\n\nimport pandas as pd\n# results = ...\n# mistakes = ...\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nfrom sklearn.neighbors import KNeighborsClassifier\n\nmodel = KNeighborsClassifier(n_neighbors=3)\nmodel.fit(X_train, y_train)\npredictions = model.predict(X_val)\n\nimport pandas as pd\nresults = pd.DataFrame({\"actual\": y_val, \"predicted\": predictions}, index=y_val.index)\nmistakes = results.loc[results[\"actual\"] != results[\"predicted\"]]\nprint(mistakes)\n",
+          "hints": [
+            "构造 DataFrame 时让 y_val 和预测按当前样本顺序对应。",
+            "<code>!=</code> 表示“不相等”，得到可用于 loc 的条件。"
+          ],
+          "checks": [
+            {
+              "name": "预测与真实标签逐条配对",
+              "code": "expected=pd.DataFrame({\"actual\":y_val,\"predicted\":model.predict(X_val)},index=y_val.index);pd.testing.assert_frame_equal(results,expected)",
+              "message": "用验证集原索引，避免把预测与答案错位。"
+            },
+            {
+              "name": "错例筛选正确",
+              "code": "expected=pd.DataFrame({\"actual\":y_val,\"predicted\":model.predict(X_val)},index=y_val.index); pd.testing.assert_frame_equal(mistakes,expected.loc[expected.actual!=expected.predicted])",
+              "message": "仅保留 actual 与 predicted 不同的行。"
+            }
+          ],
+          "explain": {
+            "results = pd.DataFrame({\"actual\": y_val, \"predicted\": predictions}, index=y_val.index)": "字典键成为列名，真实标签与预测数组按当前验证集行序组成表。显式保留样本索引，便于回看原始花朵。",
+            "mistakes = results.loc[results[\"actual\"] != results[\"predicted\"]]": "逐行比较两列，保留判断错误的记录。",
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "X_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)": "只把开发集再拆分，25% 开发数据用于验证。Iris 最后得到 90 条训练、30 条验证、30 条测试。",
+            "from sklearn.neighbors import KNeighborsClassifier": "从 sklearn.neighbors 模块导入 KNeighborsClassifier，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "model = KNeighborsClassifier(n_neighbors=3)": "创建 KNN 分类器，指定看最近的 3 个训练邻居，目前尚未拟合。",
+            "model.fit(X_train, y_train)": "用训练特征和标签拟合模型。若 model 是流水线，会依次训练标准化器和分类器。",
+            "predictions = model.predict(X_val)": "用已训练的模型预测验证特征，只传特征，不传答案。输出的顺序与 X_val 行序相同。",
+            "import pandas as pd": "导入 pandas 并使用短名字 pd，供后面的代码调用。",
+            "print(mistakes)": "只打印实际类别与预测类别不一致的记录，保留原样本索引，以便回查原始特征。"
+          }
+        }
+      ]
+    },
+    {
+      "short": "评价指标",
+      "tag": "Metrics",
+      "title": "知道模型错在哪里",
+      "description": "从一个总分，走向逐类检查。",
+      "question": "准确率相同，错误的分布也一样吗？",
+      "concept": "<p>今天先用 6 个手写答案练指标，不训练模型，便于手算。accuracy=正确数量/总数。confusion_matrix 的行是真实类别，列是预测类别，对角线是正确预测。</p><p>对某一类：precision=这类预测中真正正确的比例，recall=真正属于这类的样本被找回的比例。F1=2×precision×recall/(precision+recall)。macro F1 先对每类求 F1，再让每个类别等权平均，不能把总体 precision、recall 先平均再直接代入当作 macro F1。</p><p>例子中第 0 类有两个预测为 0、一个被错分为 1。该类 precision=2/2=1，recall=2/3，F1=0.8。不能只盯着整体准确率，尤其类别数量不均衡时。</p>",
+      "tasks": [
+        {
+          "id": "w2d4_1",
+          "short": "准确率",
+          "title": "先手算一次正确率",
+          "description": "<p>真实标签和预测标签已经给出。</p>",
+          "requirements": [
+            "用 <code>correct_count</code> 保存正确数量。",
+            "用 <code>manual_accuracy</code> 保存手算比例。",
+            "用 accuracy_score 得到 <code>accuracy</code>，对照手算结果。"
+          ],
+          "starter": "import numpy as np\n\ny_true = np.array([0, 0, 0, 1, 1, 2])\ny_pred = np.array([0, 0, 1, 1, 2, 2])\n\nfrom sklearn.metrics import accuracy_score\n# 计算三个变量\n",
+          "solution": "import numpy as np\n\ny_true = np.array([0, 0, 0, 1, 1, 2])\ny_pred = np.array([0, 0, 1, 1, 2, 2])\n\nfrom sklearn.metrics import accuracy_score\ncorrect_count = (y_true == y_pred).sum()\nmanual_accuracy = correct_count / len(y_true)\naccuracy = accuracy_score(y_true, y_pred)\nprint(correct_count, manual_accuracy, accuracy)\n",
+          "hints": [
+            "两个数组相等会返回一组 True/False。",
+            "True 求和得到正确数量，再除以样本总数。"
+          ],
+          "checks": [
+            {
+              "name": "手算与函数计算一致",
+              "code": "assert correct_count==4 and np.isclose(manual_accuracy,4/6) and np.isclose(accuracy,4/6)",
+              "message": "6 条中有 4 条正确，准确率约 0.6667。"
+            }
+          ],
+          "explain": {
+            "correct_count = (y_true == y_pred).sum()": "逐位置判断预测是否等于答案，True 按 1 计，求和得到 4。",
+            "manual_accuracy = correct_count / len(y_true)": "用正确数除以标签总数，得到 4/6。",
+            "accuracy = accuracy_score(y_true, y_pred)": "调用库函数验证手算结果。",
+            "import numpy as np": "导入 numpy 并使用短名字 np，供后面的代码调用。",
+            "y_true = np.array([0, 0, 0, 1, 1, 2])": "准备六条真实标签，位置代表同一批样本的顺序。",
+            "y_pred = np.array([0, 0, 1, 1, 2, 2])": "准备对应的六条预测，第三、第五条出错，其余四条正确。",
+            "from sklearn.metrics import accuracy_score": "从 sklearn.metrics 模块导入 accuracy_score，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "print(correct_count, manual_accuracy, accuracy)": "依次打印正确数量 4、手算正确率 4/6 和库函数正确率；后两者应相等。"
+          }
+        },
+        {
+          "id": "w2d4_2",
+          "short": "混淆矩阵",
+          "title": "每一种错误发生了几次？",
+          "description": "<p>用真实类别作行，预测类别作列。</p>",
+          "requirements": [
+            "生成矩阵 <code>cm</code>，labels=[0, 1, 2]。",
+            "用 <code>class0_to_1</code> 保存真实 0 被预测成 1 的数量。",
+            "用 <code>correct_total</code> 保存对角线之和。"
+          ],
+          "starter": "import numpy as np\n\ny_true = np.array([0, 0, 0, 1, 1, 2])\ny_pred = np.array([0, 0, 1, 1, 2, 2])\n\nfrom sklearn.metrics import confusion_matrix\n# 计算矩阵和两个数量\n",
+          "solution": "import numpy as np\n\ny_true = np.array([0, 0, 0, 1, 1, 2])\ny_pred = np.array([0, 0, 1, 1, 2, 2])\n\nfrom sklearn.metrics import confusion_matrix\ncm = confusion_matrix(y_true, y_pred, labels=[0, 1, 2])\nclass0_to_1 = cm[0, 1]\ncorrect_total = np.trace(cm)\nprint(cm)\nprint(class0_to_1, correct_total)\n",
+          "hints": [
+            "<code>cm[真实类别位置, 预测类别位置]</code> 取相应计数。",
+            "np.trace 对方阵主对角线求和。"
+          ],
+          "checks": [
+            {
+              "name": "矩阵计数正确",
+              "code": "assert np.array_equal(cm,[[2,1,0],[0,1,1],[0,0,1]])",
+              "message": "行是真实标签，列是预测标签。"
+            },
+            {
+              "name": "错误位置与对角线正确",
+              "code": "assert class0_to_1==1 and correct_total==4",
+              "message": "0→1 的错误有 1 次，对角线总数为 4。"
+            }
+          ],
+          "explain": {
+            "cm = confusion_matrix(y_true, y_pred, labels=[0, 1, 2])": "统计每种真实/预测组合的次数，并固定行列类别顺序为 0、1、2。",
+            "class0_to_1 = cm[0, 1]": "取第 0 行第 1 列，代表真实 0 却预测 1 的数量。",
+            "correct_total = np.trace(cm)": "主对角线上的记录都是预测正确的，求和得到正确总数。",
+            "import numpy as np": "导入 numpy 并使用短名字 np，供后面的代码调用。",
+            "y_true = np.array([0, 0, 0, 1, 1, 2])": "准备六条真实标签，位置代表同一批样本的顺序。",
+            "y_pred = np.array([0, 0, 1, 1, 2, 2])": "准备对应的六条预测，第三、第五条出错，其余四条正确。",
+            "from sklearn.metrics import confusion_matrix": "从 sklearn.metrics 模块导入 confusion_matrix，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "print(cm)": "显示 3×3 混淆矩阵。第 i 行、第 j 列记录真实类别 i、预测类别 j 的样本数，不能把行列方向读反。",
+            "print(class0_to_1, correct_total)": "先显示真实 0 被预测为 1 的数量 1，再显示对角线之和 4，即全部预测正确的数量。"
+          }
+        },
+        {
+          "id": "w2d4_3",
+          "short": "逐类 F1",
+          "title": "让每一种花都占一票",
+          "description": "<p>分别计算每类 F1，再计算宏平均。</p>",
+          "requirements": [
+            "用 <code>per_class_f1</code> 保存 average=None 的三个 F1，固定 labels=[0,1,2]。",
+            "用 <code>macro_f1</code> 保存 average=\"macro\" 的结果。",
+            "两次都设置 zero_division=0。"
+          ],
+          "starter": "import numpy as np\n\ny_true = np.array([0, 0, 0, 1, 1, 2])\ny_pred = np.array([0, 0, 1, 1, 2, 2])\n\nfrom sklearn.metrics import f1_score\n# per_class_f1 = ...\n# macro_f1 = ...\n",
+          "solution": "import numpy as np\n\ny_true = np.array([0, 0, 0, 1, 1, 2])\ny_pred = np.array([0, 0, 1, 1, 2, 2])\n\nfrom sklearn.metrics import f1_score\nper_class_f1 = f1_score(y_true, y_pred, labels=[0, 1, 2], average=None, zero_division=0)\nmacro_f1 = f1_score(y_true, y_pred, labels=[0, 1, 2], average=\"macro\", zero_division=0)\nprint(per_class_f1)\nprint(macro_f1)\n",
+          "hints": [
+            "average=None 返回每类一个值，macro 返回一个平均值。",
+            "zero_division=0 指标分母为零时返回 0，避免未定义警告。"
+          ],
+          "checks": [
+            {
+              "name": "逐类与宏平均 F1 正确",
+              "code": "assert np.allclose(per_class_f1,[.8,.5,2/3]) and np.isclose(macro_f1,np.mean([.8,.5,2/3]))",
+              "message": "三个 F1 分别为 0.8、0.5、约 0.6667；宏平均约 0.6556。"
+            }
+          ],
+          "explain": {
+            "per_class_f1 = f1_score(y_true, y_pred, labels=[0, 1, 2], average=None, zero_division=0)": "对三类分别计算 F1。average=None 保留三个结果；zero_division 指标无定义时采用 0。",
+            "macro_f1 = f1_score(y_true, y_pred, labels=[0, 1, 2], average=\"macro\", zero_division=0)": "让每类 F1 等权平均成一个值，本例约 0.6556，不是准确率的另一个写法。",
+            "import numpy as np": "导入 numpy 并使用短名字 np，供后面的代码调用。",
+            "y_true = np.array([0, 0, 0, 1, 1, 2])": "准备六条真实标签，位置代表同一批样本的顺序。",
+            "y_pred = np.array([0, 0, 1, 1, 2, 2])": "准备对应的六条预测，第三、第五条出错，其余四条正确。",
+            "from sklearn.metrics import f1_score": "从 sklearn.metrics 模块导入 f1_score，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "print(per_class_f1)": "显示类别 0、1、2 各自的 F1，约为 [0.8, 0.5, 0.6667]，可以看出第 1 类表现较差。",
+            "print(macro_f1)": "显示每类 F1 等权平均后的单个分数，本例约为 0.6556。"
+          }
+        }
+      ]
+    },
+    {
+      "short": "标准化流水线",
+      "tag": "Pipeline",
+      "title": "把预处理和模型接起来",
+      "description": "使用训练集学到的尺度，处理所有新样本。",
+      "question": "为什么不能分别标准化训练集和验证集？",
+      "concept": "<p>你在 Week 1 手算过 (x−均值)/标准差。StandardScaler 会在 fit 时记住每个特征的训练均值与标准差，再用 transform 把相同规则应用到新数据。它使用总体方差的约定（ddof=0）。</p><p>验证集和测试集不能拿来重新 fit 预处理器，否则会使用本不该用于训练的信息。也不要把各个集合分别缩放到均值 0，那样新数据与训练数据采用了不同坐标系。</p><p>make_pipeline 把处理步骤串起来：fit 时先训练 scaler，再训练 KNN；predict 时先用保存的 scaler 变换，再预测。Pipeline 的好处是让同一条处理路线不容易漏步骤。</p>",
+      "tasks": [
+        {
+          "id": "w2d5_1",
+          "short": "训练尺度",
+          "title": "只用训练集计算缩放参数",
+          "description": "<p>用 StandardScaler 替代手写标准化，并验证保存的均值。</p>",
+          "requirements": [
+            "创建 <code>scaler</code>。",
+            "用 fit_transform 得到 <code>train_scaled</code>，仅输入 X_train。",
+            "只用 transform 得到 <code>val_scaled</code>，输入 X_val。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nfrom sklearn.preprocessing import StandardScaler\n# 完成标准化\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nfrom sklearn.preprocessing import StandardScaler\nscaler = StandardScaler()\ntrain_scaled = scaler.fit_transform(X_train)\nval_scaled = scaler.transform(X_val)\nprint(scaler.mean_)\nprint(train_scaled.mean(axis=0).round(6))\nprint(val_scaled.shape)\n",
+          "hints": [
+            "fit_transform = 学习参数再变换；transform = 只用已保存的参数变换。",
+            "不要对 X_val 再 fit 或 fit_transform。"
+          ],
+          "checks": [
+            {
+              "name": "缩放参数只来自训练集",
+              "code": "from sklearn.preprocessing import StandardScaler\nassert isinstance(scaler,StandardScaler) and int(scaler.n_samples_seen_)==len(X_train) and np.allclose(scaler.mean_,X_train.mean())",
+              "message": "scaler 应只学习训练集的 90 条记录。"
+            },
+            {
+              "name": "两份数据使用同一尺度",
+              "code": "expected=StandardScaler().fit(X_train);assert np.allclose(train_scaled,expected.transform(X_train)) and np.allclose(val_scaled,expected.transform(X_val))",
+              "message": "验证集要使用训练均值和标准差。"
+            }
+          ],
+          "explain": {
+            "scaler = StandardScaler()": "创建标准化器，此时还不知道任何均值或标准差。",
+            "train_scaled = scaler.fit_transform(X_train)": "先从训练集学均值和标准差，再标准化训练集，返回数组。",
+            "val_scaled = scaler.transform(X_val)": "使用训练时保存的参数变换验证集，不重新计算尺度。",
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "X_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)": "只把开发集再拆分，25% 开发数据用于验证。Iris 最后得到 90 条训练、30 条验证、30 条测试。",
+            "from sklearn.preprocessing import StandardScaler": "从 sklearn.preprocessing 模块导入 StandardScaler，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "print(scaler.mean_)": "显示 scaler 从训练数据学到的每列均值。属性名末尾的下划线表示拟合后才获得的属性。",
+            "print(train_scaled.mean(axis=0).round(6))": "axis=0 沿行方向求平均，得到每一列的均值；round(6) 保留 6 位小数便于观察。训练集标准化后每列均值应接近 0，可能出现 -0.0。",
+            "print(val_scaled.shape)": "显示标准化验证数组的形状 (30, 4)。标准化改变数值尺度，不增加或删除样本、特征。"
+          }
+        },
+        {
+          "id": "w2d5_2",
+          "short": "组合 Pipeline",
+          "title": "一次 fit，整条流程一起训练",
+          "description": "<p>将 StandardScaler 和 3 近邻模型组合起来。</p>",
+          "requirements": [
+            "用 <code>model</code> 保存流水线，两步依次为 StandardScaler、KNeighborsClassifier(n_neighbors=3)。",
+            "在原始 X_train、y_train 上 fit。",
+            "用 <code>predictions</code> 保存原始 X_val 的流水线预测，用 <code>val_accuracy</code> 保存准确率。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\nfrom sklearn.metrics import accuracy_score\n# 创建流水线并训练\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\n\nmodel = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=3))\nmodel.fit(X_train, y_train)\n\nfrom sklearn.metrics import accuracy_score\npredictions = model.predict(X_val)\nval_accuracy = accuracy_score(y_val, predictions)\nprint(val_accuracy)\n",
+          "hints": [
+            "传给流水线的是原始特征，不需要在外面先标准化一遍。",
+            "make_pipeline 接收多个步骤对象，顺序就是处理顺序。"
+          ],
+          "checks": [
+            {
+              "name": "流水线顺序与训练范围正确",
+              "code": "from sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\nassert isinstance(model,Pipeline) and len(model.steps)==2 and isinstance(model[0],StandardScaler) and isinstance(model[1],KNeighborsClassifier) and model[1].n_neighbors==3 and int(model[0].n_samples_seen_)==90 and np.allclose(model[0].mean_,X_train.mean())",
+              "message": "按 scaler → KNN 的顺序，只在训练集上 fit。"
+            },
+            {
+              "name": "预测与评价完整",
+              "code": "from sklearn.metrics import accuracy_score\nassert len(predictions)==30 and np.array_equal(predictions,model.predict(X_val)) and np.isclose(val_accuracy,accuracy_score(y_val,predictions))",
+              "message": "使用原始验证表作为流水线 predict 输入。"
+            }
+          ],
+          "explain": {
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "X_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)": "只把开发集再拆分，25% 开发数据用于验证。Iris 最后得到 90 条训练、30 条验证、30 条测试。",
+            "from sklearn.pipeline import make_pipeline": "从 sklearn.pipeline 模块导入 make_pipeline，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.preprocessing import StandardScaler": "从 sklearn.preprocessing 模块导入 StandardScaler，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.neighbors import KNeighborsClassifier": "从 sklearn.neighbors 模块导入 KNeighborsClassifier，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "model = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=3))": "先创建标准化器，再创建 KNN；把两者按顺序传给 make_pipeline，得到一个可直接 fit/predict 的流程。",
+            "model.fit(X_train, y_train)": "用训练特征和标签拟合模型。若 model 是流水线，会依次训练标准化器和分类器。",
+            "from sklearn.metrics import accuracy_score": "从 sklearn.metrics 模块导入 accuracy_score，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "predictions = model.predict(X_val)": "用已训练的模型预测验证特征，只传特征，不传答案。输出的顺序与 X_val 行序相同。",
+            "val_accuracy = accuracy_score(y_val, predictions)": "评价验证预测的正确比例，只评价、不训练。",
+            "print(val_accuracy)": "显示模型的验证准确率。例如 0.9333 表示约 93.33% 的验证样本分类正确。"
+          }
+        },
+        {
+          "id": "w2d5_3",
+          "short": "新的样本",
+          "title": "给两朵新花做预测",
+          "description": "<p>训练好的流水线已给出。新花只有测量值，没有标签。</p>",
+          "requirements": [
+            "用 <code>new_predictions</code> 保存两朵花的类别预测。",
+            "用 <code>new_probabilities</code> 保存 predict_proba 的概率表。",
+            "用 <code>probability_sums</code> 保存每行概率之和。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\n\nmodel = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=3))\nmodel.fit(X_train, y_train)\n\nimport pandas as pd\nnew_flowers = pd.DataFrame([[5.1, 3.5, 1.4, 0.2], [6.7, 3.0, 5.2, 2.3]], columns=X.columns)\n# 预测类别和概率\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\n\nmodel = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=3))\nmodel.fit(X_train, y_train)\n\nimport pandas as pd\nnew_flowers = pd.DataFrame([[5.1, 3.5, 1.4, 0.2], [6.7, 3.0, 5.2, 2.3]], columns=X.columns)\nnew_predictions = model.predict(new_flowers)\nnew_probabilities = model.predict_proba(new_flowers)\nprobability_sums = new_probabilities.sum(axis=1)\nprint(new_predictions)\nprint(new_probabilities)\nprint(probability_sums)\n",
+          "hints": [
+            "predict 输出每行一个类别；predict_proba 输出每行每个类别的概率。",
+            "按行求和用 axis=1，应接近 1。"
+          ],
+          "checks": [
+            {
+              "name": "新样本预测正确",
+              "code": "assert np.array_equal(new_predictions,model.predict(new_flowers)) and np.asarray(new_predictions).shape==(2,)",
+              "message": "对给出的两朵花调用已训练流水线。"
+            },
+            {
+              "name": "概率与类别列对应",
+              "code": "assert np.asarray(new_probabilities).shape==(2,3) and np.allclose(new_probabilities,model.predict_proba(new_flowers)) and np.allclose(probability_sums,[1,1])",
+              "message": "两行三列，每行和为 1；列顺序由 model.classes_ 决定。"
+            }
+          ],
+          "explain": {
+            "new_flowers = pd.DataFrame([[5.1, 3.5, 1.4, 0.2], [6.7, 3.0, 5.2, 2.3]], columns=X.columns)": "为两朵花建立特征表，使用与训练一致的列名和顺序。每行四个数，没有答案标签。",
+            "new_predictions = model.predict(new_flowers)": "只预测，不重新训练。流水线内部会先按训练尺度标准化。",
+            "new_probabilities = model.predict_proba(new_flowers)": "输出类别概率。KNN 默认由邻居投票比例估计，概率 1 也不保证现实中绝对正确。列对应 model.classes_ 的顺序。",
+            "probability_sums = new_probabilities.sum(axis=1)": "把每朵花的三类概率加起来，结果应为 1。",
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "X_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)": "只把开发集再拆分，25% 开发数据用于验证。Iris 最后得到 90 条训练、30 条验证、30 条测试。",
+            "from sklearn.pipeline import make_pipeline": "从 sklearn.pipeline 模块导入 make_pipeline，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.preprocessing import StandardScaler": "从 sklearn.preprocessing 模块导入 StandardScaler，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.neighbors import KNeighborsClassifier": "从 sklearn.neighbors 模块导入 KNeighborsClassifier，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "model = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=3))": "先创建标准化器，再创建 KNN；把两者按顺序传给 make_pipeline，得到一个可直接 fit/predict 的流程。",
+            "model.fit(X_train, y_train)": "用训练特征和标签拟合模型。若 model 是流水线，会依次训练标准化器和分类器。",
+            "import pandas as pd": "导入 pandas 并使用短名字 pd，供后面的代码调用。",
+            "print(new_predictions)": "显示两朵新花的类别预测，顺序对应 new_flowers 的两行；此处类别仍用编号表示。",
+            "print(new_probabilities)": "显示 2×3 数组：两行对应两朵花，三列按模型 classes_ 的类别顺序排列。KNN 默认等权时，数值是邻居属于各类的比例。",
+            "print(probability_sums)": "显示每一行概率的和。每朵花所有类别的概率总和应为 1（允许浮点误差）。"
+          }
+        }
+      ]
+    },
+    {
+      "short": "比较与验证",
+      "tag": "Validation",
+      "title": "让实验有可比较的依据",
+      "description": "固定数据划分，观察模型复杂度和参数的影响。",
+      "question": "分数提高，是方法更好，还是刚好碰上了这次划分？",
+      "concept": "<p>训练分数与验证分数要一起看。训练很好而验证较差，可能是过拟合；两者都差，可能是模型太简单或特征不足。小样本上的一次结果有波动，不能机械地下结论。</p><p>超参数是在 fit 之前指定的设置，例如 KNN 的 k、决策树最大深度。今天比较它们时保持划分不变，不查看测试集分数。</p><p>交叉验证把开发集分成 5 份，每次 4 份训练、1 份验证，重复五次后得到五个分数。StratifiedKFold 让分类比例尽量一致。必须把 scaler 放进 Pipeline 后再交叉验证，确保每一折只用自己的训练部分计算尺度。</p>",
+      "tasks": [
+        {
+          "id": "w2d6_1",
+          "short": "训练与验证",
+          "title": "比较两棵不同深度的树",
+          "description": "<p>浅树与深树可能有不同的拟合能力。</p>",
+          "requirements": [
+            "创建列表 <code>models</code>，依次为 max_depth=1 和 max_depth=None 的 DecisionTreeClassifier，两者 random_state=42。",
+            "分别只用训练集 fit。",
+            "创建 <code>comparison</code>，两行依次为 shallow、full，列为 name、train_accuracy、val_accuracy。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nimport pandas as pd\nfrom sklearn.tree import DecisionTreeClassifier\n# 建树、训练、记录两种分数\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nimport pandas as pd\nfrom sklearn.tree import DecisionTreeClassifier\nmodels = [DecisionTreeClassifier(max_depth=1, random_state=42), DecisionTreeClassifier(max_depth=None, random_state=42)]\nrows = []\nfor name, estimator in zip([\"shallow\", \"full\"], models):\n    estimator.fit(X_train, y_train)\n    rows.append({\"name\": name, \"train_accuracy\": estimator.score(X_train, y_train), \"val_accuracy\": estimator.score(X_val, y_val)})\ncomparison = pd.DataFrame(rows)\nprint(comparison)\n",
+          "hints": [
+            "分类器的 score(X,y) 默认计算准确率，不是重新 fit。",
+            "用列表收集每个模型的一行字典，再转成 DataFrame。"
+          ],
+          "checks": [
+            {
+              "name": "两棵树及其拟合数据正确",
+              "code": "from sklearn.tree import DecisionTreeClassifier\nassert len(models)==2 and all(isinstance(m,DecisionTreeClassifier) for m in models) and models[0].max_depth==1 and models[1].max_depth is None and all(m.tree_.n_node_samples[0]==90 for m in models)",
+              "message": "分别建深度 1 和不限深度的树，训练样本数应为 90。"
+            },
+            {
+              "name": "记录了正确的训练与验证分数",
+              "code": "expected=pd.DataFrame([{\"name\":n,\"train_accuracy\":m.score(X_train,y_train),\"val_accuracy\":m.score(X_val,y_val)} for n,m in zip([\"shallow\",\"full\"],models)]);pd.testing.assert_frame_equal(comparison,expected)",
+              "message": "不能把测试集分数放进这个比较表。"
+            }
+          ],
+          "explain": {
+            "models = [DecisionTreeClassifier(max_depth=1, random_state=42), DecisionTreeClassifier(max_depth=None, random_state=42)]": "创建两棵树。深度 1 只能作很简单的划分；None 不额外限制最大深度。两棵树都固定随机种子。",
+            "rows = []": "准备一个空列表，收集每次实验的结果。",
+            "for name, estimator in zip([\"shallow\", \"full\"], models):": "zip 把名字和模型按位置配对，循环分别处理两棵树。",
+            "    estimator.fit(X_train, y_train)": "当前这棵树只用训练数据学习。",
+            "    rows.append({\"name\": name, \"train_accuracy\": estimator.score(X_train, y_train), \"val_accuracy\": estimator.score(X_val, y_val)})": "把名字、训练准确率、验证准确率记录为一行。分类器 score 默认是准确率。",
+            "comparison = pd.DataFrame(rows)": "将字典列表转换为可比较的表格。",
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "X_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)": "只把开发集再拆分，25% 开发数据用于验证。Iris 最后得到 90 条训练、30 条验证、30 条测试。",
+            "import pandas as pd": "导入 pandas 并使用短名字 pd，供后面的代码调用。",
+            "from sklearn.tree import DecisionTreeClassifier": "从 sklearn.tree 模块导入 DecisionTreeClassifier，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "print(comparison)": "显示两棵树的训练准确率和验证准确率，横向比较拟合程度与未见数据表现。"
+          }
+        },
+        {
+          "id": "w2d6_2",
+          "short": "选择 k",
+          "title": "只用验证集选择近邻数量",
+          "description": "<p>候选 k 为 1、3、5、9，全部使用标准化流水线。</p>",
+          "requirements": [
+            "创建 <code>scores_by_k</code> 字典，把 k 映射到验证准确率。",
+            "用 <code>best_k</code> 保存最高验证分数对应的 k；并列时选较小的 k。",
+            "每个候选只用 X_train、y_train 训练。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\ncandidates = [1, 3, 5, 9]\n# 逐个训练和记录\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nX_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)\n\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\ncandidates = [1, 3, 5, 9]\nscores_by_k = {}\nfor k in candidates:\n    candidate = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=k))\n    candidate.fit(X_train, y_train)\n    scores_by_k[k] = candidate.score(X_val, y_val)\nbest_k = max(candidates, key=lambda k: scores_by_k[k])\nprint(scores_by_k)\nprint(best_k)\n",
+          "hints": [
+            "字典用 k 当键、准确率当值。",
+            "candidates 已升序；max 按 key 指定分数比较，同分保留最先出现的 k。"
+          ],
+          "checks": [
+            {
+              "name": "候选验证分数正确",
+              "code": "from sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\ne={k:make_pipeline(StandardScaler(),KNeighborsClassifier(n_neighbors=k)).fit(X_train,y_train).score(X_val,y_val) for k in [1,3,5,9]}; assert set(scores_by_k)==set(e) and all(np.isclose(scores_by_k[k],e[k]) for k in e)",
+              "message": "每个候选都重新建立 scaler+KNN，只在训练集 fit。"
+            },
+            {
+              "name": "按验证分数选择参数",
+              "code": "assert best_k==max([1,3,5,9],key=lambda k:scores_by_k[k])",
+              "message": "只按验证分数比较，同分选较小 k。"
+            }
+          ],
+          "explain": {
+            "candidates = [1, 3, 5, 9]": "先明确有限的候选范围，不去无休止地试参数。",
+            "scores_by_k = {}": "创建空字典，记录 k 与验证分数的关系。",
+            "for k in candidates:": "按列表顺序遍历候选 k。",
+            "    candidate = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=k))": "为当前 k 建立全新的标准化和 KNN 流水线。",
+            "    candidate.fit(X_train, y_train)": "拟合当前候选，只用训练样本。",
+            "    scores_by_k[k] = candidate.score(X_val, y_val)": "把当前候选的验证准确率写入字典。",
+            "best_k = max(candidates, key=lambda k: scores_by_k[k])": "max 比较的是 key 函数返回的分数，不是 k 本身大小。候选按升序排列，同分时返回第一个，也就是较小 k。",
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "X_train, X_val, y_train, y_val = train_test_split(X_dev, y_dev, test_size=0.25, stratify=y_dev, random_state=42)": "只把开发集再拆分，25% 开发数据用于验证。Iris 最后得到 90 条训练、30 条验证、30 条测试。",
+            "from sklearn.pipeline import make_pipeline": "从 sklearn.pipeline 模块导入 make_pipeline，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.preprocessing import StandardScaler": "从 sklearn.preprocessing 模块导入 StandardScaler，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.neighbors import KNeighborsClassifier": "从 sklearn.neighbors 模块导入 KNeighborsClassifier，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "print(scores_by_k)": "显示 k → 验证准确率的字典，用于比较候选近邻数。",
+            "print(best_k)": "打印按验证成绩选出的近邻数量 k；它是参数值，不是准确率。"
+          }
+        },
+        {
+          "id": "w2d6_3",
+          "short": "交叉验证",
+          "title": "用五次划分评价同一条流程",
+          "description": "<p>重新使用 120 条开发数据，测试集依然封存。</p>",
+          "requirements": [
+            "创建标准化 + KNN(k=3) 流水线 <code>pipeline</code>。",
+            "创建 cv=StratifiedKFold(n_splits=5, shuffle=True, random_state=42)。",
+            "用 cross_val_score 在 X_dev、y_dev 上计算 accuracy，保存为 <code>cv_scores</code>。",
+            "用 <code>cv_mean</code> 保存五折平均分。"
+          ],
+          "starter": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\n\nfrom sklearn.model_selection import StratifiedKFold, cross_val_score\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\n# 定义流水线与交叉验证\n",
+          "solution": "from sklearn.datasets import load_iris\n\niris = load_iris(as_frame=True)\nX = iris.data\ny = iris.target\n\nfrom sklearn.model_selection import train_test_split\n\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\n\nfrom sklearn.model_selection import StratifiedKFold, cross_val_score\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\npipeline = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=3))\ncv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)\ncv_scores = cross_val_score(pipeline, X_dev, y_dev, cv=cv, scoring=\"accuracy\")\ncv_mean = cv_scores.mean()\nprint(cv_scores)\nprint(cv_mean)\n",
+          "hints": [
+            "cross_val_score 会为每一折创建并训练模型副本，不需要事先 fit。",
+            "把预处理放在 pipeline 中，避免在交叉验证前用整个开发集学习缩放参数。"
+          ],
+          "checks": [
+            {
+              "name": "交叉验证设置正确",
+              "code": "from sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\nassert isinstance(pipeline,Pipeline) and isinstance(pipeline[0],StandardScaler) and isinstance(pipeline[1],KNeighborsClassifier) and pipeline[1].n_neighbors==3 and cv.n_splits==5 and cv.shuffle and cv.random_state==42",
+              "message": "5 折分层打乱、固定随机种子；流水线必须包含标准化。"
+            },
+            {
+              "name": "五折结果与均值正确",
+              "code": "from sklearn.model_selection import cross_val_score\ne=cross_val_score(pipeline,X_dev,y_dev,cv=cv,scoring=\"accuracy\");assert np.asarray(cv_scores).shape==(5,) and np.allclose(cv_scores,e) and np.isclose(cv_mean,e.mean())",
+              "message": "在 120 条开发数据上做五折，测试集不参与。"
+            }
+          ],
+          "explain": {
+            "from sklearn.datasets import load_iris": "从 sklearn.datasets 模块导入 load_iris，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "iris = load_iris(as_frame=True)": "读取内置鸢尾花数据。as_frame=True 让特征是 DataFrame、标签是 Series，方便延续上一周的表格操作。",
+            "X = iris.data": "取特征表，每行一朵花、每列一个测量值，形状为 (150, 4)。",
+            "y = iris.target": "取类别标签，形状为 (150,)。数字 0、1、2 是品种编号。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "from sklearn.model_selection import StratifiedKFold, cross_val_score": "从 sklearn.model_selection 模块导入 StratifiedKFold, cross_val_score，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.pipeline import make_pipeline": "从 sklearn.pipeline 模块导入 make_pipeline，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.preprocessing import StandardScaler": "从 sklearn.preprocessing 模块导入 StandardScaler，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.neighbors import KNeighborsClassifier": "从 sklearn.neighbors 模块导入 KNeighborsClassifier，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "pipeline = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=3))": "把标准化和分类器放进同一流程，交叉验证时每折都独立训练预处理步骤。",
+            "cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)": "定义 5 折分层划分方案。shuffle=True 先打乱，random_state=42 让打乱结果可复现。它定义划分方式，不直接训练模型。",
+            "cv_scores = cross_val_score(pipeline, X_dev, y_dev, cv=cv, scoring=\"accuracy\")": "在开发集上按 cv 做五次训练/验证，每次用新模型副本，返回 5 个准确率。",
+            "cv_mean = cv_scores.mean()": "对五个验证分数求平均，用于概括当前流程的表现，不能理解成对新数据准确率的保证。",
+            "print(cv_scores)": "显示五个验证分数，每一项对应一折；它们由五次独立拟合得到。",
+            "print(cv_mean)": "显示五折准确率的算术平均值。它汇总五次实验，不是某个单独模型的训练分数。"
+          }
+        }
+      ]
+    },
+    {
+      "short": "独立分类项目",
+      "tag": "Project",
+      "title": "换一份数据，完成整个流程",
+      "description": "用葡萄酒化学测量数据，检验这一周的理解。",
+      "question": "最后的测试分数有没有参与模型选择？",
+      "concept": "<p>Wine 是另一个内置分类数据集：178 个样本、13 个化学测量特征、3 个类别。这里预测的是数据中的类别标签，不是质量高低。本次先封存 20% 测试样本，再只用开发数据交叉验证选择 k。</p><p>前两题只看开发数据；第三题才用全部开发数据训练最终模型并评价测试集。查看测试分数后，不再按它选择 k；否则测试集就变成了另一个验证集，最终评价会偏乐观。</p><p>三道题每次独立运行，后面题目的模板会带上前面所需步骤。第 3 题会重新运行交叉验证来复现选择过程，目的不是使用测试集反复调参。</p>",
+      "tasks": [
+        {
+          "id": "w2d7_1",
+          "short": "新数据划分",
+          "title": "为新的分类任务准备数据",
+          "description": "<p>读取 Wine 并留出测试样本。</p>",
+          "requirements": [
+            "创建 wine、X、y。",
+            "按 test_size=0.2、stratify=y、random_state=42 得到 X_dev、X_test、y_dev、y_test。",
+            "打印开发集和测试集形状。"
+          ],
+          "starter": "from sklearn.datasets import load_wine\nfrom sklearn.model_selection import train_test_split\n\n# 读取并划分 Wine\n",
+          "solution": "from sklearn.datasets import load_wine\nfrom sklearn.model_selection import train_test_split\n\nwine = load_wine(as_frame=True)\nX = wine.data\ny = wine.target\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\nprint(X_dev.shape, X_test.shape)\n",
+          "hints": [
+            "用 load_wine(as_frame=True)，接口与 Iris 相似。",
+            "因为样本数不是 5 的倍数，20% 留出会得到 36 个测试样本。"
+          ],
+          "checks": [
+            {
+              "name": "新数据与划分正确",
+              "code": "from sklearn.datasets import load_wine\nfrom sklearn.model_selection import train_test_split\ne=load_wine(as_frame=True);a,b,c,d=train_test_split(e.data,e.target,test_size=.2,stratify=e.target,random_state=42);pd.testing.assert_frame_equal(X_dev,a);pd.testing.assert_frame_equal(X_test,b);pd.testing.assert_series_equal(y_dev,c);pd.testing.assert_series_equal(y_test,d)",
+              "message": "开发集 142×13，测试集 36×13，特征与标签要配对。"
+            }
+          ],
+          "explain": {
+            "wine = load_wine(as_frame=True)": "读取内置 Wine 数据，并请求表格形式，无需联网。",
+            "X = wine.data": "取 13 列测量特征。",
+            "y = wine.target": "取三个类别的整数标签。",
+            "from sklearn.datasets import load_wine": "从 sklearn.datasets 模块导入 load_wine，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "print(X_dev.shape, X_test.shape)": "分别打印开发表与测试表的形状，每个形状是 (行数, 特征列数)。Iris 是 (120, 4)、(30, 4)；Wine 是 (142, 13)、(36, 13)。"
+          }
+        },
+        {
+          "id": "w2d7_2",
+          "short": "开发集选参",
+          "title": "只在开发数据上挑选 k",
+          "description": "<p>比较 k=3、5、7 的标准化 KNN，使用五折分层交叉验证。</p>",
+          "requirements": [
+            "用 <code>cv_means</code> 字典保存各 k 的平均 accuracy。",
+            "cv 使用 5 折、shuffle=True、random_state=42。",
+            "用 <code>best_k</code> 保存最高平均分对应 k，同分选较小值。"
+          ],
+          "starter": "from sklearn.datasets import load_wine\nfrom sklearn.model_selection import train_test_split\n\nwine = load_wine(as_frame=True)\nX = wine.data\ny = wine.target\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\n\nfrom sklearn.model_selection import StratifiedKFold, cross_val_score\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\ncandidates = [3, 5, 7]\n# 开发集交叉验证\n",
+          "solution": "from sklearn.datasets import load_wine\nfrom sklearn.model_selection import train_test_split\n\nwine = load_wine(as_frame=True)\nX = wine.data\ny = wine.target\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\n\nimport numpy as np\nfrom sklearn.model_selection import StratifiedKFold, cross_val_score\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\n\ncv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)\ncandidates = [3, 5, 7]\ncv_means = {}\nfor k in candidates:\n    candidate = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=k))\n    scores = cross_val_score(candidate, X_dev, y_dev, cv=cv, scoring=\"accuracy\")\n    cv_means[k] = scores.mean()\nbest_k = max(candidates, key=lambda k: cv_means[k])\nprint(cv_means)\nprint(best_k)\n",
+          "hints": [
+            "每个 k 新建 StandardScaler + KNN 流水线。",
+            "cross_val_score 的输入是 X_dev、y_dev，绝不使用 X_test、y_test 选参。"
+          ],
+          "checks": [
+            {
+              "name": "三个候选的交叉验证均值正确",
+              "code": "from sklearn.model_selection import StratifiedKFold,cross_val_score\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\nfolds=StratifiedKFold(n_splits=5,shuffle=True,random_state=42); e={k:cross_val_score(make_pipeline(StandardScaler(),KNeighborsClassifier(n_neighbors=k)),X_dev,y_dev,cv=folds,scoring=\"accuracy\").mean() for k in [3,5,7]};assert set(cv_means)==set(e) and all(np.isclose(cv_means[k],e[k]) for k in e)",
+              "message": "每折独立学习标准化参数，只用 142 条开发样本。"
+            },
+            {
+              "name": "参数选择符合规则",
+              "code": "assert best_k==max([3,5,7],key=lambda k:cv_means[k])",
+              "message": "按交叉验证均值选择，同分选较小的 k。"
+            }
+          ],
+          "explain": {
+            "candidates = [3, 5, 7]": "列出三个候选近邻数，按升序排列。",
+            "cv_means = {}": "字典保存每个 k 的五折平均准确率。",
+            "for k in candidates:": "依次评估每个候选 k。",
+            "    scores = cross_val_score(candidate, X_dev, y_dev, cv=cv, scoring=\"accuracy\")": "把开发集交给五折验证；每折重新训练整条流水线，不触碰测试集。",
+            "    cv_means[k] = scores.mean()": "把五次验证的准确率求平均，记到当前 k 的字典项。",
+            "best_k = max(candidates, key=lambda k: cv_means[k])": "选择平均分最高的 k；同分取候选列表中先出现的较小值。",
+            "from sklearn.datasets import load_wine": "从 sklearn.datasets 模块导入 load_wine，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "wine = load_wine(as_frame=True)": "读取内置 Wine 数据，并请求表格形式，无需联网。",
+            "X = wine.data": "取 13 列测量特征。",
+            "y = wine.target": "取三个类别的整数标签。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "import numpy as np": "导入 numpy 并使用短名字 np，供后面的代码调用。",
+            "from sklearn.model_selection import StratifiedKFold, cross_val_score": "从 sklearn.model_selection 模块导入 StratifiedKFold, cross_val_score，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.pipeline import make_pipeline": "从 sklearn.pipeline 模块导入 make_pipeline，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.preprocessing import StandardScaler": "从 sklearn.preprocessing 模块导入 StandardScaler，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.neighbors import KNeighborsClassifier": "从 sklearn.neighbors 模块导入 KNeighborsClassifier，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)": "定义 5 折分层划分方案。shuffle=True 先打乱，random_state=42 让打乱结果可复现。它定义划分方式，不直接训练模型。",
+            "    candidate = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=k))": "为当前 k 建立全新的标准化和 KNN 流水线。",
+            "print(cv_means)": "显示字典中每个候选 k 对应的五折平均验证准确率。",
+            "print(best_k)": "打印按验证成绩选出的近邻数量 k；它是参数值，不是准确率。"
+          }
+        },
+        {
+          "id": "w2d7_3",
+          "short": "最终测试与导出",
+          "title": "交付你的第一个分类项目",
+          "description": "<p>模板已完成开发集选参。现在训练最终模型，只在最后评价测试集。</p>",
+          "requirements": [
+            "用 <code>final_model</code> 保存标准化 + KNN(best_k)，用全部 X_dev、y_dev 训练。",
+            "用 <code>test_predictions</code> 保存测试集预测。",
+            "计算 <code>test_accuracy</code> 和 <code>test_macro_f1</code>，F1 设置 average=\"macro\"、zero_division=0。",
+            "导出 <code>wine_predictions.csv</code>，列依次为 sample_id、actual、predicted，保留 X_test 的原始行序，不附加索引。"
+          ],
+          "starter": "from sklearn.datasets import load_wine\nfrom sklearn.model_selection import train_test_split\n\nwine = load_wine(as_frame=True)\nX = wine.data\ny = wine.target\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\n\nimport numpy as np\nfrom sklearn.model_selection import StratifiedKFold, cross_val_score\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\n\ncv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)\ncandidates = [3, 5, 7]\ncv_means = {}\nfor k in candidates:\n    candidate = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=k))\n    scores = cross_val_score(candidate, X_dev, y_dev, cv=cv, scoring=\"accuracy\")\n    cv_means[k] = scores.mean()\nbest_k = max(candidates, key=lambda k: cv_means[k])\n\nimport pandas as pd\nfrom sklearn.metrics import accuracy_score, f1_score\n# 最终训练、评价、导出\n",
+          "solution": "from sklearn.datasets import load_wine\nfrom sklearn.model_selection import train_test_split\n\nwine = load_wine(as_frame=True)\nX = wine.data\ny = wine.target\nX_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)\n\nimport numpy as np\nfrom sklearn.model_selection import StratifiedKFold, cross_val_score\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\n\ncv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)\ncandidates = [3, 5, 7]\ncv_means = {}\nfor k in candidates:\n    candidate = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=k))\n    scores = cross_val_score(candidate, X_dev, y_dev, cv=cv, scoring=\"accuracy\")\n    cv_means[k] = scores.mean()\nbest_k = max(candidates, key=lambda k: cv_means[k])\n\nimport pandas as pd\nfrom sklearn.metrics import accuracy_score, f1_score\nfinal_model = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=best_k))\nfinal_model.fit(X_dev, y_dev)\ntest_predictions = final_model.predict(X_test)\ntest_accuracy = accuracy_score(y_test, test_predictions)\ntest_macro_f1 = f1_score(y_test, test_predictions, average=\"macro\", zero_division=0)\noutput = pd.DataFrame({\"sample_id\": X_test.index, \"actual\": y_test.to_numpy(), \"predicted\": test_predictions})\noutput.to_csv(\"wine_predictions.csv\", index=False)\nprint(\"accuracy:\", test_accuracy)\nprint(\"macro F1:\", test_macro_f1)\n",
+          "hints": [
+            "最终训练可以使用全部开发集，因为 k 已经由开发集内部的交叉验证决定。",
+            "导出前用字典列表列顺序指定三个字段，actual 和 predicted 按测试集当前顺序对应。"
+          ],
+          "checks": [
+            {
+              "name": "最终模型使用全部开发集",
+              "code": "from sklearn.pipeline import Pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\nassert isinstance(final_model,Pipeline) and isinstance(final_model[0],StandardScaler) and isinstance(final_model[1],KNeighborsClassifier) and final_model[1].n_neighbors==best_k and int(final_model[0].n_samples_seen_)==142 and np.allclose(final_model[0].mean_,X_dev.mean())",
+              "message": "用选出的 k 创建流水线，在 142 条开发数据上拟合。"
+            },
+            {
+              "name": "测试评价计算正确",
+              "code": "from sklearn.metrics import accuracy_score,f1_score\npred=final_model.predict(X_test);assert np.array_equal(test_predictions,pred) and np.isclose(test_accuracy,accuracy_score(y_test,pred)) and np.isclose(test_macro_f1,f1_score(y_test,pred,average=\"macro\",zero_division=0))",
+              "message": "对测试集预测后再计算 accuracy 和 macro F1。"
+            },
+            {
+              "name": "导出结果完整且样本对应",
+              "code": "out=pd.read_csv(\"wine_predictions.csv\"); expected=pd.DataFrame({\"sample_id\":X_test.index,\"actual\":y_test.to_numpy(),\"predicted\":test_predictions});pd.testing.assert_frame_equal(out,expected)",
+              "message": "应有 36 行，三列顺序正确，不附加索引；运行后可下载文件。"
+            }
+          ],
+          "explain": {
+            "final_model = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=best_k))": "使用已经选定的 k 创建最终模型，不再参考测试分数修改 k。",
+            "final_model.fit(X_dev, y_dev)": "在整个开发集重新拟合尺度和分类器，使可用开发数据全部参与最终训练。",
+            "test_predictions = final_model.predict(X_test)": "对一直保留的测试集做预测，输出每行的类别。",
+            "test_accuracy = accuracy_score(y_test, test_predictions)": "计算最终测试准确率。",
+            "test_macro_f1 = f1_score(y_test, test_predictions, average=\"macro\", zero_division=0)": "计算每类等权的测试 F1，补充准确率这个整体指标。",
+            "output = pd.DataFrame({\"sample_id\": X_test.index, \"actual\": y_test.to_numpy(), \"predicted\": test_predictions})": "保留测试样本原始身份，同时写出答案与预测；to_numpy 去掉 Series 索引，按当前顺序组装表。",
+            "output.to_csv(\"wine_predictions.csv\", index=False)": "保存到指定文件，不把默认行索引写成多余一列。",
+            "from sklearn.datasets import load_wine": "从 sklearn.datasets 模块导入 load_wine，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.model_selection import train_test_split": "从 sklearn.model_selection 模块导入 train_test_split，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "wine = load_wine(as_frame=True)": "读取内置 Wine 数据，并请求表格形式，无需联网。",
+            "X = wine.data": "取 13 列测量特征。",
+            "y = wine.target": "取三个类别的整数标签。",
+            "X_dev, X_test, y_dev, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)": "同时切分特征与标签，拿出 20% 测试数据。四个返回值依次是开发特征、测试特征、开发标签、测试标签。stratify 保持类别比例，random_state 固定划分。",
+            "import numpy as np": "导入 numpy 并使用短名字 np，供后面的代码调用。",
+            "from sklearn.model_selection import StratifiedKFold, cross_val_score": "从 sklearn.model_selection 模块导入 StratifiedKFold, cross_val_score，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.pipeline import make_pipeline": "从 sklearn.pipeline 模块导入 make_pipeline，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.preprocessing import StandardScaler": "从 sklearn.preprocessing 模块导入 StandardScaler，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "from sklearn.neighbors import KNeighborsClassifier": "从 sklearn.neighbors 模块导入 KNeighborsClassifier，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)": "定义 5 折分层划分方案。shuffle=True 先打乱，random_state=42 让打乱结果可复现。它定义划分方式，不直接训练模型。",
+            "candidates = [3, 5, 7]": "列出三个候选近邻数，按升序排列。",
+            "cv_means = {}": "字典保存每个 k 的五折平均准确率。",
+            "for k in candidates:": "依次评估每个候选 k。",
+            "    candidate = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=k))": "为当前 k 建立全新的标准化和 KNN 流水线。",
+            "    scores = cross_val_score(candidate, X_dev, y_dev, cv=cv, scoring=\"accuracy\")": "把开发集交给五折验证；每折重新训练整条流水线，不触碰测试集。",
+            "    cv_means[k] = scores.mean()": "把五次验证的准确率求平均，记到当前 k 的字典项。",
+            "best_k = max(candidates, key=lambda k: cv_means[k])": "选择平均分最高的 k；同分取候选列表中先出现的较小值。",
+            "import pandas as pd": "导入 pandas 并使用短名字 pd，供后面的代码调用。",
+            "from sklearn.metrics import accuracy_score, f1_score": "从 sklearn.metrics 模块导入 accuracy_score, f1_score，之后可直接用这些名称调用；这一步不会读取数据或训练模型。",
+            "print(\"accuracy:\", test_accuracy)": "先打印文字 accuracy:，再打印最终测试准确率，方便识别输出。",
+            "print(\"macro F1:\", test_macro_f1)": "先打印文字 macro F1:，再打印最终测试的每类等权 F1。"
+          }
+        }
+      ]
+    }
+  ]
+}
