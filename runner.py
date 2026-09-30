@@ -3,6 +3,7 @@ import base64
 import contextlib
 import io
 import json
+import linecache
 import os
 from pathlib import Path
 import sys
@@ -39,16 +40,31 @@ class BoundedOutput(io.StringIO):
             super().write(value[:remaining])
         return len(value)
 
+def describe(exc):
+    frames=[f for f in traceback.extract_tb(exc.__traceback__) if f.filename=='practice.py']
+    line=frames[-1].lineno if frames else None
+    message=str(exc)
+    if isinstance(exc,SyntaxError) and exc.filename=='practice.py':
+        line,message=exc.lineno,exc.msg or message
+    head=['Traceback (most recent call last):\n',*traceback.format_list(frames[-8:])] if frames else []
+    trace=''.join(head+traceback.format_exception_only(type(exc),exc))
+    return {'type':type(exc).__name__,'message':message[:2000],'line':line,'trace':trace[-8000:]}
+
 out=BoundedOutput()
-result={'stdout':'','error':None,'checks':[],'images':[],'files':[]}
+result={'stdout':'','error':None,'error_info':None,'checks':[],'images':[],'files':[]}
 namespace={'__name__':'__main__'}
 # pyplot.show is intentionally non-blocking; all open figures are collected below.
 plt.show=lambda *a,**k: None
+code=request['code']
+# The code never exists on disk; caching it lets tracebacks show the learner's source lines.
+linecache.cache['practice.py']=(len(code),None,code.splitlines(True),'practice.py')
 try:
     with contextlib.redirect_stdout(out),contextlib.redirect_stderr(out):
-        exec(compile(request['code'],'practice.py','exec'),namespace)
-except BaseException:
+        exec(compile(code,'practice.py','exec'),namespace)
+except BaseException as exc:
     result['error']=traceback.format_exc(limit=5)
+    try:result['error_info']=describe(exc)
+    except Exception:pass
 result['stdout']=out.getvalue()
 if not result['error']:
     for check in request.get('checks',[]):
