@@ -1,5 +1,5 @@
 'use strict';
-let curriculum, allWeeks, config, state={schemaVersion:2,week:1,positions:{},codes:{},passed:{},hints:{},seen:{},day:0,task:0}, free=false, mode='learn', busy=false, aborter=null, saveTimer, toastTimer, errorLine=0, gutterKey='', tabOut=false, paintFrame=0;
+let curriculum, allWeeks, config, state={schemaVersion:3,week:1,positions:{},codes:{},passed:{},hints:{},seen:{},day:0,task:0}, free=false, mode='learn', busy=false, aborter=null, saveTimer, toastTimer, errorLine=0, gutterKey='', tabOut=false, paintFrame=0;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const weekLabel=()=>`第 ${state.week} 周`;
@@ -14,7 +14,7 @@ const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)');
 function weekHeading(){document.title=`IOAI Lab · 第 ${state.week} 周练习`;$('week-title').innerHTML=`第 ${num(state.week)} 周 · ${esc(curriculum.title)}`}
 function toast(message){$('toast').textContent=message;$('toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').classList.remove('visible'),3000)}
 function saved(ok){$('save-status').textContent=ok?'已自动保存到本机':'本地服务未连接 · 请导出备份';$('save-alert').hidden=ok}
-async function persist(){state.schemaVersion=2;state.positions[state.week]={day:state.day,task:state.task};try{localStorage.setItem('ioai-week1',JSON.stringify(state))}catch{};try{const r=await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json','X-Lab-Token':config.token},body:JSON.stringify(state)});if(!r.ok)throw Error();saved(true)}catch{saved(false)}}
+async function persist(){state.schemaVersion=3;state.positions[state.week]={day:state.day,task:state.task};try{localStorage.setItem('ioai-week1',JSON.stringify(state))}catch{};try{const r=await fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json','X-Lab-Token':config.token},body:JSON.stringify(state)});if(!r.ok)throw Error();saved(true)}catch{saved(false)}}
 function save(){clearTimeout(saveTimer);saveTimer=setTimeout(persist,350)}
 
 // "Learned" lives in the browser (the server keeps a fixed field list): {"w2d4": ISO time}. The home page reads the same key.
@@ -48,6 +48,23 @@ const lineStart=(v,i)=>i&&v.lastIndexOf('\n',i-1)+1;
 // insertText keeps the browser undo stack (setRangeText wipes it); setting the selection afterwards closes the typing group so each Tab/Enter undoes on its own.
 function editRange(a,from,to,text,s=from+text.length,e=s){a.setSelectionRange(from,to);if(!(text?document.execCommand('insertText',false,text):from===to||document.execCommand('delete'))){a.setRangeText(text,from,to);edited()}a.setSelectionRange(s,e)}
 function indentLines(a,out){const v=a.value,s=a.selectionStart,e=a.selectionEnd,from=lineStart(v,s);if(!out&&!v.slice(s,e).includes('\n'))return editRange(a,s,e,'    ');let to=v.indexOf('\n',e>s&&v[e-1]==='\n'?e-1:e);if(to<0)to=v.length;const old=v.slice(from,to),rows=old.split('\n'),cut=rows.map(r=>out?r.match(/^ {0,4}/)[0].length:0),text=rows.map((r,i)=>out?r.slice(cut[i]):r&&'    '+r).join('\n');if(text===old)return;if(rows.length>1||!out)editRange(a,from,to,text,from,from+text.length);else editRange(a,from,to,text,Math.max(from,s-cut[0]),Math.max(from,e-cut[0]))}
+// Line comments: one undo step; ignore an unselected next line at column zero.
+function toggleComment(a){
+ const v=a.value,s=a.selectionStart,e=a.selectionEnd,dir=a.selectionDirection,from=lineStart(v,s);
+ let to=v.indexOf('\n',e>s&&v[e-1]==='\n'?e-1:e);if(to<0)to=v.length;
+ const rows=v.slice(from,to).split('\n'),nonempty=rows.filter(r=>r.trim());
+ const remove=nonempty.length>0&&nonempty.every(r=>/^[ \t]*#/.test(r));
+ const edits=[];let offset=from;
+ for(const row of rows){
+  if(row.trim()||rows.length===1){const indent=row.match(/^[ \t]*/)[0].length,pos=offset+indent;
+   edits.push({pos,cut:remove?(row[indent+1]===' '?2:1):0,put:remove?'':'# '});}
+  offset+=row.length+1;
+ }
+ if(!edits.length)return;
+ let text=v.slice(from,to);for(const edit of [...edits].reverse()){const i=edit.pos-from;text=text.slice(0,i)+edit.put+text.slice(i+edit.cut)}
+ const map=pos=>{let delta=0;for(const x of edits){if(pos<x.pos)break;if(pos<=x.pos+x.cut)return x.pos+delta+x.put.length;delta+=x.put.length-x.cut}return pos+delta};
+ const top=a.scrollTop,left=a.scrollLeft;editRange(a,from,to,text,map(s),map(e));a.setSelectionRange(map(s),map(e),dir);a.scrollTop=top;a.scrollLeft=left;syncScroll();
+}
 function remember(){const v=$('editor').value;if(learning()){try{localStorage.setItem(scratchKey(),v)}catch{};return}state.codes[codeKey()]=v;try{localStorage.setItem('ioai-week1',JSON.stringify(state))}catch{};save()}
 function setEditor(value){const ed=$('editor');ed.value=value;ed.scrollTop=0;ed.scrollLeft=0;paint(true);syncScroll()}
 
@@ -65,7 +82,7 @@ $('breadcrumb').innerHTML=`<span>${weekLabel()}</span>${icon('chevron-right','cr
 $('lecture-no').innerHTML=free?'':`第${num(state.day+1)}讲`;$('lecture-no').hidden=free;$('lecture-title').textContent=free?'让想法跑起来':d.title;$('question-label').textContent=free?'运行环境：':'本讲核心问题：';$('question-text').textContent=free?'可使用 NumPy、Pandas、Matplotlib 和 scikit-learn；每次运行都是全新的环境。':d.question;
 $('mode-switch').hidden=free;$('mode-learn').setAttribute('aria-selected',learning());$('mode-practice').setAttribute('aria-selected',checking());$('mode-learn').tabIndex=checking()?-1:0;$('mode-practice').tabIndex=checking()?0:-1;$('handout-body').setAttribute('aria-labelledby',checking()?'mode-practice':'mode-learn');$('practice-meta').innerHTML=`${num(d.tasks.length)} 题`;$('practice-count').textContent=d.tasks.length;
 $('learn-view').hidden=checking();$('practice-view').hidden=!checking();syncNotes();
-if(checking()){renderTaskTabs();$('task-level').textContent=`练习 ${state.task+1} / ${d.tasks.length}`;$('task-title').textContent=t.title;$('task-description').innerHTML=t.description;$('requirements').innerHTML=`<div class="mini-label">完成这些步骤</div><ul>${t.requirements.map(x=>`<li>${x}</li>`).join('')}</ul>`;$('data-panel').innerHTML=t.data||'';const ex=exampleFor(state.task);$('example-row').hidden=ex<0;if(ex>=0){$('example-link').href='#note-sec-'+(ex+1);$('example-link').innerHTML=`${icon('arrow-left')}对应示例：${esc(notesHeads[ex].textContent)}`}$('solution-details').open=false;$('solution-code').innerHTML=highlight(t.solution);renderHints();$('handout-scroll').scrollTop=0}
+if(checking()){renderTaskTabs();$('task-level').textContent=`练习 ${state.task+1} / ${d.tasks.length}`;$('task-title').textContent=t.title;$('task-description').innerHTML=t.description;$('requirements').innerHTML=`<div class="mini-label">完成这些步骤</div><ul>${t.requirements.map(x=>`<li>${x}</li>`).join('')}</ul>`;$('data-panel').innerHTML=t.data||'';const ex=exampleFor(state.task);$('example-row').hidden=ex<0;if(ex>=0){$('example-link').href='#note-sec-'+(ex+1);$('example-link').innerHTML=`${icon('arrow-left')}相关知识：${esc(notesHeads[ex].textContent)}`}$('solution-details').open=false;$('solution-code').innerHTML=highlight(t.solution);renderHints();$('handout-scroll').scrollTop=0}
 $('file-name').textContent=free?'playground.py':learning()?'示例草稿.py':`${t.id}.py`;$('run-button').className=learning()?'button-secondary':free?'button-primary':'button-run';$('run-button').innerHTML=icon('play','icon-fill')+(free?'运行代码':learning()?'运行':'运行并检查');
 setEditor(free?(state.codes.free??FREE_START):learning()?(readScratch()??SCRATCH_START):(state.codes[t.id]??t.starter));
 $('start-practice').hidden=!learning();$('next-task').hidden=learning();$('next-task').innerHTML=free?`${icon('arrow-left')}回到第 ${state.day+1} 天`:(state.day===6&&state.task===2?'返回训练中心':state.task===2?`进入第 ${state.day+2} 天`:'下一题')+(free?'':icon('arrow-right'));footStatus();
@@ -80,7 +97,7 @@ const ERROR_TIPS={KeyError:'找不到这个键或列名。检查拼写和大小�
 ERROR_TIPS.ModuleNotFoundError=ERROR_TIPS.ImportError;ERROR_TIPS.TabError=ERROR_TIPS.IndentationError;
 function errorCard(r,head){const x=r.error_info,msg=x?x.message:r.error.trim(),tip=x&&ERROR_TIPS[x.type],box=document.createElement('div');box.className='error-card';box.innerHTML=`<p class="error-head">${icon('alert')}<strong>${esc(head)}</strong></p>${msg?`<pre class="error-message">${esc(msg)}</pre>`:''}${tip?`<p class="error-tip">${tip}</p>`:''}${x?.trace?`<details class="error-trace"><summary>查看完整报错</summary><pre>${esc(x.trace)}</pre></details>`:''}`;return box}
 async function run(){if(busy)return;remember();const graded=checking(),runKey=graded?task().id:null,code=$('editor').value;busy=true;aborter=new AbortController();$('run-button').disabled=true;$('stop-button').hidden=false;markError(0);setStatus('正在运行…','busy');$('run-summary').textContent='正在运行';$('result-content').innerHTML='<p class="output-text">正在执行 Python…</p>';try{const response=await fetch('/api/run',{method:'POST',signal:aborter.signal,headers:{'Content-Type':'application/json','X-Lab-Token':config.token},body:JSON.stringify({code,task:runKey})});const r=await response.json();if(!response.ok)throw Error(r.error||'运行服务出错');const el=$('result-content'),checks=r.checks||[],ok=checks.filter(c=>c.passed).length,x=r.error_info,head=r.error?x?(x.line?`第 ${x.line} 行出错：${x.type}`:`代码出错：${x.type}`):'运行没有完成':'',skipped=r.error&&graded&&!checks.length;el.replaceChildren();if(r.stdout){const p=document.createElement('pre');p.className='output-text';p.textContent=r.stdout;el.append(p)}if(r.error)el.append(errorCard(r,head));if(skipped){const p=document.createElement('p');p.className='check skipped';p.innerHTML=`${icon('circle')}<span>${x?'代码出错，':''}本次没有运行检查。改好后再运行一次。</span>`;el.append(p)}for(const c of checks){const block=document.createElement('div');block.className=`check ${c.passed?'':'fail'}`;block.innerHTML=`${icon(c.passed?'check':'circle')}<div>${esc(c.name)}${!c.passed?`<small>${esc(c.message)}</small>`:''}</div>`;el.append(block)}for(const src of r.images||[]){const img=document.createElement('img');img.src='data:image/png;base64,'+src;img.alt='本次 Python 运行生成的图表';img.className='result-figure';el.append(img)}if(r.files?.length){const wrap=document.createElement('div');wrap.className='result-files';for(const f of r.files){const a=document.createElement('a');a.href='data:application/octet-stream;base64,'+f.data;a.download=f.name;a.textContent='下载 '+f.name;wrap.append(a)}el.append(wrap)}const passed=graded&&!r.error&&checks.length&&ok===checks.length;if(passed){state.passed[runKey]={at:new Date().toISOString(),withSolution:!!state.seen[runKey]};save();progress();renderTaskTabs();footStatus();const p=document.createElement('div');p.className='success-banner';p.innerHTML=icon('check')+(state.seen[runKey]?'本题通过。看过解法的题，记得隔天独立重做。':'本题通过，做得好！试着解释每一步为什么这样写。');el.append(p)}if(!el.children.length)el.innerHTML='<p class="output-text">运行完成，没有输出。可以用 print() 查看变量。</p>';if(x?.line>0&&$('editor').value===code)markError(Math.min(x.line,code.split('\n').length));const [text,tone,said]=r.error?['运行出错','danger',head+(skipped?'。本次没有运行检查':'')]:!graded||!checks.length?['运行成功','done','运行成功']:passed?['全部通过','done','全部检查通过，本题完成']:[`未通过 · ${ok}/${checks.length}`,'warn',`未通过：${checks.length} 项检查中通过了 ${ok} 项`];setStatus(text,tone);$('run-summary').textContent=said}catch(e){const stopped=e.name==='AbortError';$('result-content').innerHTML=`<p class="output-text output-error">${stopped?'运行已停止。':esc(e.message)+'。请确认本地服务正在运行。'}</p>`;setStatus(stopped?'已停止':'连接失败',stopped?'':'danger');$('run-summary').textContent=stopped?'运行已停止':'连接失败，请确认本地服务正在运行'}finally{busy=false;$('run-button').disabled=false;$('stop-button').hidden=true;aborter=null}}
-$('editor').addEventListener('input',edited);$('editor').addEventListener('scroll',syncScroll,{passive:true});$('editor').addEventListener('blur',()=>tabOut=false);$('editor').addEventListener('keydown',e=>{if(e.isComposing||e.keyCode===229)return;const a=e.target;if(e.key==='Escape'){tabOut=true;return}if(e.key==='Tab'&&!e.altKey&&!e.ctrlKey&&!e.metaKey){if(tabOut){tabOut=false;return}e.preventDefault();indentLines(a,e.shiftKey);return}if(!['Shift','Control','Alt','Meta'].includes(e.key))tabOut=false;if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();run()}else if(e.key==='Enter'){e.preventDefault();const start=a.selectionStart,prefix=a.value.slice(lineStart(a.value,start),start),indent=(prefix.match(/^ */)||[''])[0]+(prefix.trimEnd().endsWith(':')?'    ':'');editRange(a,start,a.selectionEnd,'\n'+indent)}});
+$('editor').addEventListener('input',edited);$('editor').addEventListener('scroll',syncScroll,{passive:true});$('editor').addEventListener('blur',()=>tabOut=false);$('editor').addEventListener('keydown',e=>{if(e.isComposing||e.keyCode===229)return;const a=e.target;if(e.key==='Escape'){tabOut=true;return}if(e.key==='Tab'&&!e.altKey&&!e.ctrlKey&&!e.metaKey){if(tabOut){tabOut=false;return}e.preventDefault();indentLines(a,e.shiftKey);return}if(!['Shift','Control','Alt','Meta'].includes(e.key))tabOut=false;if((e.metaKey||e.ctrlKey)&&!e.altKey&&!e.shiftKey&&(e.key==='/'||e.code==='Slash')){e.preventDefault();toggleComment(a);return}if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();run()}else if(e.key==='Enter'){e.preventDefault();const start=a.selectionStart,prefix=a.value.slice(lineStart(a.value,start),start),indent=(prefix.match(/^ */)||[''])[0]+(prefix.trimEnd().endsWith(':')?'    ':'');editRange(a,start,a.selectionEnd,'\n'+indent)}});
 $('task-tabs').addEventListener('click',e=>{const b=e.target.closest('[data-task]');if(b)navigate(state.day,Number(b.dataset.task),'practice')});
 $('task-tabs').addEventListener('keydown',e=>{const n=day().tasks.length,i=Number(e.target.closest('[data-task]')?.dataset.task??state.task),to={ArrowLeft:(i+n-1)%n,ArrowRight:(i+1)%n,Home:0,End:n-1}[e.key];if(to===undefined||e.altKey||e.ctrlKey||e.metaKey)return;e.preventDefault();if(to===state.task)$('task-tab-'+to).focus();else navigate(state.day,to,'practice')});
 $('mode-switch').addEventListener('click',e=>{const b=e.target.closest('[data-mode]');if(b)setMode(b.dataset.mode)});
@@ -97,7 +114,7 @@ $('next-task').onclick=async()=>{if(busy)return toast('请先停止当前运行'
 $('save-alert').onclick=()=>$('backup').click();
 
 // Notes: inline in the handout; the rail lists its h3 sections, and the reading position is kept per day.
-const freeNotes=()=>'<h3>你的 Python 草稿纸</h3><p>尝试今天学到的方法，也可以把自己的小例子写在这里。输出文字用 <code>print()</code>，显示图表用 <code>plt.show()</code>。</p><div class="free-note">'+(state.week===2?'scikit-learn 自带的数据集（如 <code>load_iris()</code>、<code>load_wine()</code>）无需下载，直接加载即可；<code>scores.csv</code> 和 <code>review.csv</code> 也在每次运行中可用。':'每次运行都可以直接读取 <code>scores.csv</code> 和 <code>review.csv</code>。')+'每次运行最长 30 秒。代码在本机 Python 中执行，请只运行你理解的代码。</div><h3>运行环境</h3><p>NumPy、Pandas、Matplotlib 和 scikit-learn 已安装。变量不会跨次运行保留，请在同一份代码中导入库、定义数据和执行操作。</p><p>'+(state.week===2?'本周练习用的 <code>load_iris()</code>、<code>load_wine()</code> 是 scikit-learn 自带的数据集，无需下载就能加载。第 1 周的 <code>scores.csv</code> 和 <code>review.csv</code> 在每次运行中也可以直接读取。':'内置数据文件：<code>scores.csv</code> 用于第 3–6 天，<code>review.csv</code> 用于第 7 天，每次运行都可以直接读取。')+'运行生成的 CSV 和文本文件可以从结果区下载。</p>';
+const freeNotes=()=>'<h3>你的 Python 草稿纸</h3><p>尝试今天学到的方法，也可以把自己的小例子写在这里。输出文字用 <code>print()</code>，显示图表用 <code>plt.show()</code>。</p><div class="free-note">'+(state.week>=2?'scikit-learn 自带的数据集（如 <code>load_iris()</code>、<code>load_wine()</code>）无需下载，直接加载即可；<code>scores.csv</code> 和 <code>review.csv</code> 也在每次运行中可用。':'每次运行都可以直接读取 <code>scores.csv</code> 和 <code>review.csv</code>。')+'每次运行最长 30 秒。代码在本机 Python 中执行，请只运行你理解的代码。</div><h3>运行环境</h3><p>NumPy、Pandas、Matplotlib 和 scikit-learn 已安装。变量不会跨次运行保留，请在同一份代码中导入库、定义数据和执行操作。</p><p>'+(state.week>=2?'本周练习用的 <code>load_iris()</code>、<code>load_wine()</code> 是 scikit-learn 自带的数据集，无需下载就能加载。第 1 周的 <code>scores.csv</code> 和 <code>review.csv</code> 在每次运行中也可以直接读取。':'内置数据文件：<code>scores.csv</code> 用于第 3–6 天，<code>review.csv</code> 用于第 7 天，每次运行都可以直接读取。')+'运行生成的 CSV 和文本文件可以从结果区下载。</p>';
 let notesKey=null,notesHeads=[],notesCode=[],notesObserver=null,notesTimer;
 const notesId=()=>`${state.week}-${free?'free':state.day+1}`;
 const tocLabel=h=>h.textContent.replace(/^(示例 \d+) · .*/,'$1');
@@ -116,7 +133,7 @@ function observeNotes(){notesObserver?.disconnect();notesObserver=null;if(!notes
 function renderNotes(){const c=$('notes-content');notesKey=notesId();c.innerHTML=free?freeNotes():day().notes;notesCode=[];c.querySelectorAll('pre.note-code').forEach(pre=>{const snippet=pre.textContent.replace(/\n+$/,''),setup=pre.dataset.setup,code=setup?`# 准备代码：本段示例需要的导入和数据\n${setup}\n\n# 当前示例\n${snippet}`:snippet,label=pre.previousElementSibling?.classList.contains('note-label')?pre.previousElementSibling:null,box=document.createElement('div'),i=notesCode.push(code)-1;box.className='code-block';box.dataset.code=i;box.innerHTML=`<div class="code-bar">${label?`<p class="code-label">${label.innerHTML}${setup?' · 含准备代码':''}</p>`:setup?'<p class="code-label">含准备代码</p>':''}<div class="code-actions"><button type="button" class="button-secondary run-example" aria-label="运行这段代码">${icon('play','icon-fill')}运行</button><button type="button" class="button-secondary copy-to-runner" aria-label="把这段代码复制到运行区">复制到运行区</button></div></div><div class="code-panel"><button type="button" class="copy-code" title="复制代码" aria-label="复制代码">${icon('copy')}</button></div>`;label?.remove();pre.replaceWith(box);pre.innerHTML=`<code>${highlightLines(snippet)}</code>`;box.lastElementChild.prepend(pre)});c.querySelectorAll('ol.note-explanations').forEach((ol,i)=>{ol.querySelectorAll(':scope>li>code:first-child').forEach(code=>code.parentElement.append(code));const label=ol.previousElementSibling;if(!label?.classList.contains('note-label'))return;label.id=`note-ex-${i+1}`;label.classList.add('sr-only');ol.setAttribute('aria-labelledby',label.id)});notesHeads=[...c.querySelectorAll('h3')];notesHeads.forEach((h,i)=>{h.id=`note-sec-${i+1}`;h.tabIndex=-1});$('toc-list').innerHTML=notesHeads.map((h,i)=>`<li><a href="#note-sec-${i+1}" data-sec="${i}" title="${esc(h.textContent)}"><span>${esc(tocLabel(h))}</span></a></li>`).join('');$('toc-card').hidden=free||!notesHeads.length;$('learn-meta').innerHTML=`笔记 ${num(notesHeads.length)} 节`;observeNotes()}
 async function placeNotes(){await Promise.all([...$('notes-content').querySelectorAll('img')].map(i=>i.complete?0:i.decode().catch(()=>0)));if(!notesVisible())return;restoreNotesPos();markSection()}
 function syncNotes(){if(notesKey!==notesId())renderNotes();if(!$('learn-view').hidden)placeNotes();else markSection()}
-function exampleFor(i){const t=day().tasks[i];return notesHeads.findIndex(h=>h.textContent.trim()===`示例 ${i+1} · ${t.title}`)}
+function exampleFor(i){const t=day().tasks[i];return notesHeads.findIndex(h=>h.textContent.trim()===(t.noteSection||`示例 ${i+1} · ${t.title}`))}
 function goToSection(i){const h=notesHeads[i];if(!h)return;if(checking()){const all=readNotesPos();all[notesKey]=[i+1,0];try{localStorage.setItem('ioai-notes-pos',JSON.stringify(all))}catch{};setMode('learn');if(pageFlow())h.scrollIntoView()}else if(pageFlow()){h.scrollIntoView();markSection()}else{$('handout-scroll').scrollTop=notesStops()[i+1];saveNotesPos();markSection()}if(learning())h.focus({preventScroll:true})}
 $('handout-scroll').addEventListener('scroll',()=>{clearTimeout(notesTimer);notesTimer=setTimeout(()=>{if(learning()){saveNotesPos();markSection()}},250)},{passive:true});
 addEventListener('scroll',()=>{if(!learning()||!pageFlow())return;clearTimeout(notesTimer);notesTimer=setTimeout(markSection,150)},{passive:true});
@@ -133,12 +150,12 @@ $('notes-content').addEventListener('click',async e=>{const b=e.target.closest('
 // Backup helpers: include browser-only drafts and reading progress in portable exports.
 function cleanBrowserBackup(value={}){
  const v=value&&typeof value==='object'?value:{},out={scratch:{},learned:{},notesPos:{}};
- for(let w=1;w<=2;w++)for(let d=1;d<=7;d++){
+ for(const w of allWeeks.map(w=>w.id))for(let d=1;d<=7;d++){
   const id=`w${w}d${d}`,draft=v.scratch?.[id],at=v.learned?.[id];
   if(typeof draft==='string'&&draft.length<=40000)out.scratch[id]=draft;
   if(typeof at==='string'&&at.length<=50)out.learned[id]=at;
  }
- for(let w=1;w<=2;w++)for(const d of [1,2,3,4,5,6,7,'free']){
+ for(const w of allWeeks.map(w=>w.id))for(const d of [1,2,3,4,5,6,7,'free']){
   const id=`${w}-${d}`,p=v.notesPos?.[id];
   if(Array.isArray(p)&&p.length===2&&Number.isInteger(p[0])&&p[0]>=0&&p[0]<=1000&&Number.isFinite(p[1])&&p[1]>=0&&p[1]<=1)out.notesPos[id]=p;
  }
@@ -146,17 +163,17 @@ function cleanBrowserBackup(value={}){
 }
 function browserBackup(){
  const scratch={};
- for(let w=1;w<=2;w++)for(let d=1;d<=7;d++){
+ for(const w of allWeeks.map(w=>w.id))for(let d=1;d<=7;d++){
   const id=`w${w}d${d}`;try{const value=localStorage.getItem('ioai-scratch-'+id);if(value!==null)scratch[id]=value}catch{}
  }
  return cleanBrowserBackup({scratch,learned:readLearned(),notesPos:readNotesPos()});
 }
 function buildBackup(){
- return {...state,schemaVersion:2,positions:{...state.positions,[state.week]:{day:state.day,task:state.task}},browser:browserBackup()};
+ return {...state,schemaVersion:3,positions:{...state.positions,[state.week]:{day:state.day,task:state.task}},browser:browserBackup()};
 }
 function restoreBrowserBackup(value){
  const v=cleanBrowserBackup(value);
- for(let w=1;w<=2;w++)for(let d=1;d<=7;d++){
+ for(const w of allWeeks.map(w=>w.id))for(let d=1;d<=7;d++){
   const id=`w${w}d${d}`,key='ioai-scratch-'+id;
   if(Object.hasOwn(v.scratch,id))localStorage.setItem(key,v.scratch[id]);else localStorage.removeItem(key);
  }
@@ -167,18 +184,18 @@ function restoreBrowserBackup(value){
 
 function download(name,content,type='text/plain'){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type}));a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 $('download-code').onclick=()=>download($('file-name').textContent,$('editor').value);$('backup').onclick=()=>{remember();saveNotesPos();download('ioai-lab-backup.json',JSON.stringify(buildBackup(),null,2),'application/json');toast('学习备份已导出（含示例草稿）')};
-function validateState(v){if(!v||typeof v!=='object'||Array.isArray(v))throw Error('备份格式不正确');const validIds=new Set(['free',...allWeeks.flatMap(w=>w.days.flatMap(d=>d.tasks.map(t=>t.id)))]);const cleaned={schemaVersion:2,week:v.week===2?2:1,positions:{},codes:{},passed:{},hints:{},seen:{},day:Number.isInteger(v.day)&&v.day>=0&&v.day<7?v.day:0,task:Number.isInteger(v.task)&&v.task>=0&&v.task<3?v.task:0};for(const field of ['codes','passed','hints','seen'])for(const [id,value]of Object.entries(v[field]||{})){if(!validIds.has(id))continue;if(field==='codes'&&typeof value==='string'&&value.length<=40000)cleaned.codes[id]=value;if(field==='passed'&&value)cleaned.passed[id]=value;if(field==='seen')cleaned.seen[id]=!!value;if(field==='hints'&&Number.isInteger(value))cleaned.hints[id]=Math.max(0,Math.min(2,value))}for(const week of ['1','2']){const pos=v.positions?.[week];if(pos&&Number.isInteger(pos.day)&&pos.day>=0&&pos.day<7&&Number.isInteger(pos.task)&&pos.task>=0&&pos.task<3)cleaned.positions[week]={day:pos.day,task:pos.task};}if(!cleaned.positions[cleaned.week])cleaned.positions[cleaned.week]={day:cleaned.day,task:cleaned.task};return cleaned}
+function validateState(v){if(!v||typeof v!=='object'||Array.isArray(v))throw Error('备份格式不正确');const validIds=new Set(['free',...allWeeks.flatMap(w=>w.days.flatMap(d=>d.tasks.map(t=>t.id)))]);const cleaned={schemaVersion:3,week:allWeeks.some(w=>w.id===v.week)?v.week:1,positions:{},codes:{},passed:{},hints:{},seen:{},day:Number.isInteger(v.day)&&v.day>=0&&v.day<7?v.day:0,task:Number.isInteger(v.task)&&v.task>=0&&v.task<3?v.task:0};for(const field of ['codes','passed','hints','seen'])for(const [id,value]of Object.entries(v[field]||{})){if(!validIds.has(id))continue;if(field==='codes'&&typeof value==='string'&&value.length<=40000)cleaned.codes[id]=value;if(field==='passed'&&value)cleaned.passed[id]=value;if(field==='seen')cleaned.seen[id]=!!value;if(field==='hints'&&Number.isInteger(value))cleaned.hints[id]=Math.max(0,Math.min(2,value))}for(const week of allWeeks.map(w=>String(w.id))){const pos=v.positions?.[week];if(pos&&Number.isInteger(pos.day)&&pos.day>=0&&pos.day<7&&Number.isInteger(pos.task)&&pos.task>=0&&pos.task<3)cleaned.positions[week]={day:pos.day,task:pos.task};}if(!cleaned.positions[cleaned.week])cleaned.positions[cleaned.week]={day:cleaned.day,task:cleaned.task};return cleaned}
 $('restore').onclick=()=>$('import').click();
 $('import').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>4000000)throw Error('备份文件过大');const raw=JSON.parse(await f.text()),v=validateState(raw),browser=cleanBrowserBackup(raw.browser);if(busy)throw Error('请先停止当前运行');if(confirm('用这份备份替换当前代码和学习进度？')){saveNotesPos();restoreBrowserBackup(browser);state=v;curriculum=allWeeks.find(w=>w.id===state.week);free=false;mode=ruleMode(state.day);weekHeading();await persist();render();toast('已恢复学习进度')}}catch(error){toast(error.message)}finally{e.target.value=''}};
 addEventListener('resize',()=>{placeThumb();if(errorLine)placeBand()});
 async function init(){try{
-const responses=await Promise.all([fetch('/api/config',{cache:'no-store'}),fetch('/curriculum.json',{cache:'no-store'}),fetch('/week2.json',{cache:'no-store'}),fetch('/api/state',{cache:'no-store'})]);
+const responses=await Promise.all([fetch('/api/config',{cache:'no-store'}),fetch('/courses.json',{cache:'no-store'}),fetch('/api/state',{cache:'no-store'})]);
 if(responses.some(r=>!r.ok))throw Error('本地服务不可用');
-const [cfg,week1,week2,saved]=await Promise.all(responses.map(r=>r.json()));config=cfg;
-week1.id=1;week1.title='建立数据直觉';week1.description='数组、表格与可视化。把数据处理的基础练扎实。';week2.id=2;
-allWeeks=[week1,week2];
+const [cfg,catalog,saved]=await Promise.all(responses.map(r=>r.json()));config=cfg;
+if(cfg.version<3)throw Error('请重启本地服务后刷新，加载第三周课程');
+allWeeks=await Promise.all(catalog.weeks.map(async w=>{const r=await fetch(w.id===1?'/curriculum.json':`/week${w.id}.json`,{cache:'no-store'});if(!r.ok)throw Error('课程未加载');return {...await r.json(),id:w.id,title:w.title}}));
 if(saved&&Object.keys(saved).length)state=validateState(saved);else try{const local=JSON.parse(localStorage.getItem('ioai-week1'));if(local)state=validateState(local)}catch{}
-const params=new URLSearchParams(location.search),wanted=params.get('week')==='2'?2:1;
+const params=new URLSearchParams(location.search),wanted=allWeeks.some(w=>w.id===Number(params.get('week')))?Number(params.get('week')):1;
 const position=state.positions[wanted]||{day:0,task:0};state.week=wanted;state.day=position.day;state.task=position.task;
 const requestedDay=Number(params.get('day')),requestedTask=Number(params.get('task'));
 if(Number.isInteger(requestedDay)&&requestedDay>=1&&requestedDay<=7){state.day=requestedDay-1;state.task=0;}
@@ -186,7 +203,7 @@ if(Number.isInteger(requestedTask)&&requestedTask>=1&&requestedTask<=3)state.tas
 free=params.get('free')==='1';curriculum=allWeeks.find(w=>w.id===wanted);const wantedMode=params.get('mode');mode=wantedMode==='learn'||wantedMode==='practice'?wantedMode:ruleMode(state.day);if(!free&&mode==='practice')markLearned();weekHeading();render();
 document.querySelectorAll('a[data-leave]').forEach(a=>a.addEventListener('click',async e=>{if(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();if(busy)return toast('请先停止当前运行');remember();saveNotesPos();clearTimeout(saveTimer);await persist();location.href=a.href;}));
 if(document.modelContext?.registerTool){try{
-document.modelContext.registerTool({name:'read_learning_progress',description:'读取两周练习进度和当前题目。',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute:async()=>({week:state.week,completed:Object.keys(state.passed),current:free?'free':task().id,mode:free?'free':mode})});
+document.modelContext.registerTool({name:'read_learning_progress',description:'读取各周练习进度和当前题目。',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute:async()=>({week:state.week,completed:Object.keys(state.passed),current:free?'free':task().id,mode:free?'free':mode})});
 document.modelContext.registerTool({name:'open_practice_day',description:'打开本周指定学习日（尚未开始的一天先进入学习），不运行代码，也不标记完成。',inputSchema:{type:'object',properties:{day:{type:'integer',minimum:1,maximum:7}},required:['day'],additionalProperties:false},execute:async input=>{if(!Number.isInteger(input.day)||input.day<1||input.day>7||busy)throw Error('无效日期或代码正在运行');navigate(input.day-1,0);return{week:state.week,day:input.day,task:task().id,mode}}});}catch{}}
 }catch(e){setStatus('启动失败','danger');$('result-content').innerHTML='<p class="output-error">请重新双击启动脚本打开网页。页面需要本地 Python 服务。</p>';console.error(e)}}
 init();

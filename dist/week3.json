@@ -1,0 +1,454 @@
+{
+  "id": 3,
+  "title": "理解模型，独立实验",
+  "description": "从距离、纯度与损失出发，理解模型，再用新情境检验自己的判断。",
+  "days": [
+    {
+      "short": "近邻与距离",
+      "tag": "UNDERSTAND & TRANSFER",
+      "title": "KNN 为什么会这样投票？",
+      "question": "最近的一个邻居与多数邻居意见相反时，应该听谁的？",
+      "description": "从手算到独立实验，解释模型为什么这样预测。",
+      "concept": "最近的一个邻居与多数邻居意见相反时，应该听谁的？",
+      "notes": "<div class=\"note-roadmap\"><strong>建议 75–100 分钟，可分两次。</strong><br>先读原理并手算 → 运行小实验 → 换数据独立完成三题 → 解释结果。示例不是练习答案；题目会改变数据、目标或条件。遇到新函数先查本页逐句解释。</div><h3>原理：把“相似”变成可以计算的距离</h3><p>KNN 的输入 X 是二维表：每行一个样本，每列一个特征；y 是每行的类别。它的 fit 主要保存训练样本并准备查找结构。predict 才为新样本寻找最近的 k 个训练样本，再让它们投票。它没有先学出一条直线。</p><p>二维欧氏距离：<code>d = √((x₁ − q₁)² + (x₂ − q₂)²)</code>。x 是训练点，q 是待预测点，下标表示第几个特征。点 (1, 2) 到 (4, 6)：差是 −3 和 −4，平方后相加为 25，开平方得到 5。距离永远非负。</p><p>普通投票每个邻居一票。若三个邻居标签为 [0, 0, 1]，预测 0。距离加权投票让近邻更有话语权：距离为 [2, 2, 0.1] 时，三张票权重是 [0.5, 0.5, 10]，类别 1 反而胜出。零距离需要特殊处理，sklearn 已处理；本周手算只用非零距离。</p><h3>k 和标准化各改变了什么？</h3><p>k=1 只听最近者，容易受噪声影响；更大的 k 会使判断更平滑，但太大可能忽视局部结构。不是越大越好。若一个特征以千为单位、另一个只有 0–1，前者会支配距离。StandardScaler 用训练集的均值和标准差把列变成相对尺度，必须放进 Pipeline 随每折训练，不能提前用验证集计算均值。</p><h3>小实验 A · 两个点有多远</h3><p class=\"note-label\">可独立运行的小实验</p><pre class=\"note-code\">import numpy as np\na = np.array([1., 2.])\nb = np.array([4., 6.])\ndelta = a - b\ndistance = np.sqrt((delta ** 2).sum())\nprint(delta, distance)\n</pre><p class=\"note-label\">逐句解释</p><ol class=\"note-explanations\"><li><code>import numpy as np</code> 导入 NumPy，后面的 np 是它的简写。</li><li><code>a = np.array([1., 2.])</code> 创建含两个特征的一维浮点数组；小数点明确表示浮点数。</li><li><code>b = np.array([4., 6.])</code> 创建另一个点，两列与 a 对应同样的特征。</li><li><code>delta = a - b</code> 按相同位置相减，得到 [-3, -4]。</li><li><code>distance = np.sqrt((delta ** 2).sum())</code> ** 2 逐项平方；sum() 把两个平方相加；sqrt 开平方。</li><li><code>print(delta, distance)</code> 打印中间差值和最终距离，检查手算。</li></ol><p><strong>观察输出：</strong>差值 [-3. -4.]，距离 5.0。</p><p><strong>先预测，再修改：</strong>把第二个点改成 [1., 6.]，先判断距离为什么变成 4。</p><h3>小实验 B · 观察最近的邻居</h3><p class=\"note-label\">可独立运行的小实验</p><pre class=\"note-code\">from sklearn.neighbors import KNeighborsClassifier\nmodel = KNeighborsClassifier(n_neighbors=1)\nmodel.fit([[1.], [6.], [9.]], [0, 1, 1])\ndistances, indices = model.kneighbors([[2.]])\nprint(distances, indices)\nprint(model.predict([[2.]]))\n</pre><p class=\"note-label\">逐句解释</p><ol class=\"note-explanations\"><li><code>from sklearn.neighbors import KNeighborsClassifier</code> 导入 KNN 分类器的类；此时还没有创建或训练模型。</li><li><code>model = KNeighborsClassifier(n_neighbors=1)</code> 创建只参考一个邻居的分类器，默认每个邻居权重相同。</li><li><code>model.fit([[1.], [6.], [9.]], [0, 1, 1])</code> X 有 3 行 1 列；y 有 3 个类别。fit 保存学习材料。双层列表保留样本×特征结构。</li><li><code>distances, indices = model.kneighbors([[2.]])</code> 查询新点 2 的邻居；返回两个二维数组，分别是距离、训练行的位置。逗号把两个返回值分别接住。</li><li><code>print(distances, indices)</code> 显示 [[1.]] 和 [[0]]：训练第 0 行距离查询点 1。</li><li><code>print(model.predict([[2.]]))</code> 让最近邻投票，返回一维预测数组 [0]。</li></ol><p><strong>观察输出：</strong>查询点 2 的最近邻是训练点 1，类别为 0。</p><p><strong>先预测，再修改：</strong>把查询点改成 8，再把 n_neighbors 改成 3，解释两次投票。</p><h3>常见误区与排错</h3><p>距离矩阵按行汇总要用 <code>sum(axis=1)</code>：消掉特征轴，每个样本留下一个距离。<code>np.argsort(d)</code> 返回从小到大的位置，不是排好序的距离；<code>np.unique(labels, return_counts=True)</code> 返回类别和各自票数；<code>np.argmax(counts)</code> 返回最高票所在位置。并列时，本周按最小类别编号决定。</p><h3>合上笔记，自测一下</h3><p>为什么 y 不能作为 X 的一列参与距离？为什么把“米”改成“毫米”可能改变最近邻？</p><details><summary>展开核对思路</summary><p>y 是预测时未知的答案，放入 X 会泄漏答案；单位改变会改变各特征对距离的贡献。相同信息应先建立合理的尺度。</p></details><p>进一步查阅：<a href=\"https://scikit-learn.org/stable/modules/neighbors.html\" target=\"_blank\" rel=\"noopener\">scikit-learn 官方说明</a>（选读，离线时不影响学习）。</p>",
+      "tasks": [
+        {
+          "id": "w3d1_1",
+          "title": "给每个候选点计算距离",
+          "short": "手算迁移",
+          "description": "<p>你在给四个仓库寻找离配送点最近的位置。讲义只算两个点，这里要一次算出四个距离。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "定义 <code>distances_to(X, point)</code>，对任意 n 行、m 列数组返回长度 n 的欧氏距离数组。",
+            "调用函数得到 <code>distances</code>，再创建升序位置数组 <code>order</code>。"
+          ],
+          "starter": "import numpy as np\nX = np.array([[0., 0.], [4., 0.], [0., 3.], [5., 5.]])\npoint = np.array([1., 1.])\n\n# 定义函数并计算 distances、order\n",
+          "solution": "import numpy as np\nX = np.array([[0., 0.], [4., 0.], [0., 3.], [5., 5.]])\npoint = np.array([1., 1.])\n\ndef distances_to(X, point):\n    return np.sqrt(((X - point) ** 2).sum(axis=1))\ndistances = distances_to(X, point)\norder = np.argsort(distances)\nprint(distances, order)\n",
+          "hints": [
+            "先想清楚 X - point 的形状，point 会对每一行广播。",
+            "每行平方后 <code>.sum(axis=1)</code>，再开平方；排序位置用 argsort。"
+          ],
+          "noteSection": "小实验 A · 两个点有多远"
+        },
+        {
+          "id": "w3d1_2",
+          "title": "自己实现一轮近邻投票",
+          "short": "应用实验",
+          "description": "<p>识别包裹类别。请写函数，检查会更换输入点、k 和类别编号；只打印讲义答案无法通过。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "定义 <code>knn_vote(X, y, point, k)</code>，返回最近 k 个样本中的多数类别。",
+            "假设距离没有并列；票数并列时返回最小类别编号。不要调用 sklearn 的分类器。"
+          ],
+          "starter": "import numpy as np\n# 在这里定义 knn_vote；可自行构造数据打印验证\n",
+          "solution": "import numpy as np\ndef knn_vote(X, y, point, k):\n    distances = np.sqrt(((X - point) ** 2).sum(axis=1))\n    indices = np.argsort(distances)[:k]\n    labels, counts = np.unique(y[indices], return_counts=True)\n    return labels[np.argmax(counts)]\nprint(knn_vote(np.array([[0.],[3.],[8.]]), np.array([2,2,5]), np.array([4.]), 3))\n",
+          "hints": [
+            "按距离排序后，只保留前 k 个位置，再用它们取 y。",
+            "np.unique 的 labels 按升序排列，票数最高的位置可用 np.argmax。"
+          ],
+          "noteSection": "小实验 B · 观察最近的邻居"
+        },
+        {
+          "id": "w3d1_3",
+          "title": "让近邻推翻多数票",
+          "short": "独立挑战",
+          "description": "<p>三个参考包裹中，多数属于 0 类，但新包裹更接近唯一的 1 类。比较普通投票和距离加权投票。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "创建并训练 <code>uniform_model</code> 与 <code>distance_model</code>，都用 k=3，weights 分别为 uniform、distance。",
+            "分别预测 query，保存 <code>uniform_pred</code> 和 <code>distance_pred</code>。",
+            "创建 <code>reason</code>：用至少 20 个字符解释为什么两者不同，提到距离或权重。"
+          ],
+          "starter": "import numpy as np\nfrom sklearn.neighbors import KNeighborsClassifier\nX = np.array([[0.], [2.], [3.]])\ny = np.array([1, 0, 0])\nquery = np.array([[0.2]])\n\n# 创建两个模型、预测并解释\n",
+          "solution": "import numpy as np\nfrom sklearn.neighbors import KNeighborsClassifier\nX = np.array([[0.], [2.], [3.]])\ny = np.array([1, 0, 0])\nquery = np.array([[0.2]])\nuniform_model = KNeighborsClassifier(n_neighbors=3, weights='uniform').fit(X, y)\ndistance_model = KNeighborsClassifier(n_neighbors=3, weights='distance').fit(X, y)\nuniform_pred = uniform_model.predict(query)\ndistance_pred = distance_model.predict(query)\nreason = '普通投票中两个零类占多数；距离加权中最近的一类权重更大，因此结果不同。'\nprint(uniform_pred, distance_pred, reason)\n",
+          "hints": [
+            "weights 决定每张票的分量，不改变 k。",
+            "三个距离为 0.2、1.8、2.8；分别比较票数和 1/距离。"
+          ],
+          "noteSection": "原理：把“相似”变成可以计算的距离"
+        }
+      ]
+    },
+    {
+      "short": "决策树与纯度",
+      "tag": "UNDERSTAND & TRANSFER",
+      "title": "决策树怎么选问题？",
+      "question": "“按哪一列、在哪个数值切开”是怎么学出来的？",
+      "description": "从手算到独立实验，解释模型为什么这样预测。",
+      "concept": "“按哪一列、在哪个数值切开”是怎么学出来的？",
+      "notes": "<div class=\"note-roadmap\"><strong>建议 75–100 分钟，可分两次。</strong><br>先读原理并手算 → 运行小实验 → 换数据独立完成三题 → 解释结果。示例不是练习答案；题目会改变数据、目标或条件。遇到新函数先查本页逐句解释。</div><h3>原理：用一连串问题把样本分开</h3><p>一棵分类树从所有训练样本出发，问“某个特征 ≤ 某个阈值吗”。满足条件的向左，不满足的向右。在子节点继续提问，直到达到停止条件。最终叶节点按训练样本的多数类预测。fit 学出特征、阈值和叶子；predict 只沿已经学好的路线走。</p><p>例如重量 [1, 2, 5, 6]，标签 [0, 0, 1, 1]，在 3.5 切开能得到两个纯组。阈值 3.5 位于相邻不同观测值 2 和 5 的中间。树不需要记住“所有情况”，而是在每一步选当前能让类别更集中的划分，属于贪心选择，不保证全局最优。</p><h3>手算：Gini 不纯度与加权下降</h3><p><code>Gini = 1 − Σ p_c²</code>。p_c 是节点内第 c 类所占比例，Σ 表示把所有类别的平方相加。全是同一类时为 0；两类各半时为 1 − 0.5² − 0.5² = 0.5；三类等量时为 2/3。所以 Gini 并不总小于等于 0.5。</p><p>父节点有四个样本 [0, 0, 1, 1]，Gini=0.5。按 [0] 与 [0,1,1] 切开：左边 0，右边 4/9；加权后为 (1/4)×0 + (3/4)×(4/9)=1/3。下降量为 0.5−1/3=1/6。按 [0,0] 与 [1,1] 切开，下降量为 0.5，更好。权重使用样本数量，不能把两个节点简单平均。</p><h3>小实验 A · 把纯度公式变成代码</h3><p class=\"note-label\">可独立运行的小实验</p><pre class=\"note-code\">import numpy as np\ncounts = np.array([3, 1])\nproportions = counts / counts.sum()\nimpurity = 1 - (proportions ** 2).sum()\nprint(proportions, impurity)\n</pre><p class=\"note-label\">逐句解释</p><ol class=\"note-explanations\"><li><code>import numpy as np</code> 导入数组运算库。</li><li><code>counts = np.array([3, 1])</code> 一个节点内两类分别有 3 个和 1 个样本。</li><li><code>proportions = counts / counts.sum()</code> 总样本数为 4；按元素除法得到 [0.75, 0.25]。</li><li><code>impurity = 1 - (proportions ** 2).sum()</code> 计算 1−(0.75²+0.25²)，得到 Gini 不纯度。</li><li><code>print(proportions, impurity)</code> 打印类别比例和不纯度，便于核对。</li></ol><p><strong>观察输出：</strong>不纯度为 0.375。</p><p><strong>先预测，再修改：</strong>改成 [2, 2] 和 [4, 0]，先判断哪个更纯。</p><h3>小实验 B · 看见树学到的规则</h3><p class=\"note-label\">可独立运行的小实验</p><pre class=\"note-code\">from sklearn.tree import DecisionTreeClassifier, export_text\ntree = DecisionTreeClassifier(max_depth=1, random_state=7)\ntree.fit([[1.], [2.], [5.], [6.]], [0, 0, 1, 1])\nprint(export_text(tree, feature_names=[&quot;weight&quot;]))\nprint(tree.predict([[3.], [5.5]]))\n</pre><p class=\"note-label\">逐句解释</p><ol class=\"note-explanations\"><li><code>from sklearn.tree import DecisionTreeClassifier, export_text</code> 同时导入树分类器和把树转成文字的函数。</li><li><code>tree = DecisionTreeClassifier(max_depth=1, random_state=7)</code> 只允许根节点问一次问题；random_state 固定有随机性的选择。</li><li><code>tree.fit([[1.], [2.], [5.], [6.]], [0, 0, 1, 1])</code> 在四个一维样本上学习切分阈值。</li><li><code>print(export_text(tree, feature_names=[&quot;weight&quot;]))</code> feature_names 是列表，给唯一的特征起名；输出左右分支的规则。</li><li><code>print(tree.predict([[3.], [5.5]]))</code> 两行新数据分别沿树的规则走，得到 [0, 1]。</li></ol><p><strong>观察输出：</strong>规则按 weight ≤ 3.5 切开；预测为 [0 1]。</p><p><strong>先预测，再修改：</strong>把 max_depth 改成 3，为什么这个无噪声小数据可能仍然只有一层？</p><h3>常见误区与排错</h3><p><code>max_depth</code> 是允许的最大深度，不保证实际长到那么深；<code>min_samples_leaf</code> 是每片叶子至少包含的训练样本数。树用阈值而不是欧氏距离，通常不需要为尺度差异做标准化。类别数值只是编号，不能用它们的大小解释类别关系。</p><h3>合上笔记，自测一下</h3><p>两个子节点 Gini 都是 0，说明什么？只追求训练集完全正确会有什么问题？</p><details><summary>展开核对思路</summary><p>两个子节点都只含一种类别，但不保证未来数据也完美。过深的树可能为异常样本添加很多规则，记住噪声。</p></details><p>进一步查阅：<a href=\"https://scikit-learn.org/stable/modules/tree.html\" target=\"_blank\" rel=\"noopener\">scikit-learn 官方说明</a>（选读，离线时不影响学习）。</p>",
+      "tasks": [
+        {
+          "id": "w3d2_1",
+          "title": "给任意类别数组计算 Gini",
+          "short": "手算迁移",
+          "description": "<p>这里不再直接给类别计数，而是给原始标签；检查还会换成字符串标签或三个类别。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "定义 <code>gini(labels)</code>，接受非空一维标签数组，返回不纯度浮点数。",
+            "不能假设只有 0、1 两类。"
+          ],
+          "starter": "import numpy as np\n# 定义 gini(labels)\n",
+          "solution": "import numpy as np\ndef gini(labels):\n    _, counts = np.unique(labels, return_counts=True)\n    p = counts / counts.sum()\n    return 1 - np.sum(p ** 2)\nprint(gini(np.array([2,2,5,5])))\n",
+          "hints": [
+            "np.unique(..., return_counts=True) 可处理数字和字符串类别。",
+            "p = counts / counts.sum()；Gini = 1 - np.sum(p ** 2)。"
+          ],
+          "noteSection": "小实验 A · 把纯度公式变成代码"
+        },
+        {
+          "id": "w3d2_2",
+          "title": "两个切分谁更好？",
+          "short": "应用实验",
+          "description": "<p>样本数量不相等时，简单平均会出错。请复用自己的 gini 函数比较两个候选。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "创建 <code>gain_a</code>、<code>gain_b</code>，表示父节点不纯度减去子节点按人数加权的不纯度。",
+            "创建 <code>best_split</code>，值为 \"A\" 或 \"B\"，选择下降量更大的方案。"
+          ],
+          "starter": "import numpy as np\nlabels = np.array([0, 0, 1, 1, 1, 1])\n# 候选 A：左边前 2 个，右边其余 4 个；候选 B：左右各 3 个。\n# 可粘贴上一题自己的 gini 函数，再计算下降量\n",
+          "solution": "import numpy as np\nlabels = np.array([0, 0, 1, 1, 1, 1])\n# 候选 A：左边前 2 个，右边其余 4 个；候选 B：左右各 3 个。\ndef gini(labels):\n    _, counts = np.unique(labels, return_counts=True)\n    p = counts / counts.sum()\n    return 1 - np.sum(p ** 2)\nparent = gini(labels)\ngain_a = parent - (2/6*gini(labels[:2]) + 4/6*gini(labels[2:]))\ngain_b = parent - (3/6*gini(labels[:3]) + 3/6*gini(labels[3:]))\nbest_split = 'A' if gain_a > gain_b else 'B'\nprint(gain_a, gain_b, best_split)\n",
+          "hints": [
+            "先求全部六个标签的 Gini，再计算两个子节点。",
+            "不是比较子节点 Gini 的总和，而是按人数加权后再从父节点减去。"
+          ],
+          "noteSection": "手算：Gini 不纯度与加权下降"
+        },
+        {
+          "id": "w3d2_3",
+          "title": "让树区分三种包裹",
+          "short": "独立挑战",
+          "description": "<p>讲义是一层二分类，这里要分成三个类别，还要限制每个叶子的样本数。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "训练 <code>model</code>：max_depth=2、min_samples_leaf=2、random_state=7。",
+            "保存 new_X 的预测为 <code>pred</code>，用 export_text 打印规则。"
+          ],
+          "starter": "import numpy as np\nfrom sklearn.tree import DecisionTreeClassifier\nX = np.array([[1.], [2.], [4.], [5.], [8.], [9.]])\ny = np.array([0, 0, 1, 1, 2, 2])\nnew_X = np.array([[1.5], [4.5], [8.5]])\n# 训练、预测并打印规则\n",
+          "solution": "import numpy as np\nfrom sklearn.tree import DecisionTreeClassifier\nX = np.array([[1.], [2.], [4.], [5.], [8.], [9.]])\ny = np.array([0, 0, 1, 1, 2, 2])\nnew_X = np.array([[1.5], [4.5], [8.5]])\nfrom sklearn.tree import export_text\nmodel = DecisionTreeClassifier(max_depth=2, min_samples_leaf=2, random_state=7)\nmodel.fit(X, y)\npred = model.predict(new_X)\nprint(export_text(model, feature_names=['weight']))\nprint(pred)\n",
+          "hints": [
+            "先画出按重量从小到大的类别，再估计需要几次提问。",
+            "导入 export_text(model, feature_names=[\"weight\"]) 查看实际学出的阈值。"
+          ],
+          "noteSection": "小实验 B · 看见树学到的规则"
+        }
+      ]
+    },
+    {
+      "short": "复杂度与验证",
+      "tag": "UNDERSTAND & TRANSFER",
+      "title": "训练分数高，模型就好吗？",
+      "question": "什么时候模型学到了规律，什么时候只是记住了训练数据？",
+      "description": "从手算到独立实验，解释模型为什么这样预测。",
+      "concept": "什么时候模型学到了规律，什么时候只是记住了训练数据？",
+      "notes": "<div class=\"note-roadmap\"><strong>建议 75–100 分钟，可分两次。</strong><br>先读原理并手算 → 运行小实验 → 换数据独立完成三题 → 解释结果。示例不是练习答案；题目会改变数据、目标或条件。遇到新函数先查本页逐句解释。</div><h3>原理：欠拟合、过拟合与泛化</h3><p>泛化指模型对未见过的数据也有效。欠拟合是模型太简单、特征不足或训练不充分，连训练数据都表现差；过拟合是过多迎合训练样本中的偶然性，训练成绩很好，验证成绩却明显下降。一个分数不足以证明原因，要在相同数据划分和指标下对照。</p><table><thead><tr><th>模型</th><th>训练准确率</th><th>验证准确率</th><th>线索</th></tr></thead><tbody><tr><td>很浅的树</td><td>0.62</td><td>0.60</td><td>两者低，可能欠拟合</td></tr><tr><td>适中的树</td><td>0.88</td><td>0.85</td><td>差距较小，表现较好</td></tr><tr><td>极深的树</td><td>1.00</td><td>0.71</td><td>明显差距，可能过拟合</td></tr></tbody></table><p>这是示意数据，不是所有任务的固定标准。限制 max_depth、提高 min_samples_leaf 都是在限制树的复杂度。超参数是你事先设定的限制；阈值、叶子类别等则是 fit 从数据中学到的参数。</p><h3>cross_val_score 内部到底做了什么？</h3><p>4 折就是轮流拿 1/4 开发数据验证，其余 3/4 训练。每折克隆一个参数相同但尚未训练的模型，自动 fit，再在该折验证集算分；四折相互独立。返回四个分数，不会训练传入的原始模型，也不会自动选择最佳超参数。无需提前 fit。</p><p>比较深度时应使用相同 cv 划分；只使用开发集，测试集保持封存。<code>scores.mean()</code> 是四折平均值；<code>scores.std()</code> 描述四折结果的波动，不等于“未来成绩的置信区间”。确认配置后仍要对原始模型在全部开发数据上 fit，最后才评估测试集。</p><h3>小实验 A · 看训练与验证的落差</h3><p class=\"note-label\">可独立运行的小实验</p><pre class=\"note-code\">import numpy as np\ntrain = np.array([0.68, 0.90, 1.00])\nvalid = np.array([0.65, 0.87, 0.73])\ngap = train - valid\nbest = np.argmax(valid)\nprint(gap, best)\n</pre><p class=\"note-label\">逐句解释</p><ol class=\"note-explanations\"><li><code>import numpy as np</code> 导入数组工具。</li><li><code>train = np.array([0.68, 0.90, 1.00])</code> 三种复杂度设置在训练集上的示意分数。</li><li><code>valid = np.array([0.65, 0.87, 0.73])</code> 对应的验证分数；顺序必须与 train 相同。</li><li><code>gap = train - valid</code> 逐项相减，得到三种设置的训练—验证落差。</li><li><code>best = np.argmax(valid)</code> 返回验证分数最高的位置 1，绝不按 train 选。</li><li><code>print(gap, best)</code> 打印落差 [0.03,0.03,0.27] 和最佳位置。</li></ol><p><strong>观察输出：</strong>第三种设置训练满分但验证下降；选择的是第二种。</p><p><strong>先预测，再修改：</strong>把第三种验证分数改成 0.92，原来的过拟合判断还成立吗？</p><h3>小实验 B · 验证后，原始模型训练了吗</h3><p class=\"note-label\">可独立运行的小实验</p><pre class=\"note-code\">from sklearn.datasets import load_iris\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.model_selection import cross_val_score\ndata = load_iris()\ntree = DecisionTreeClassifier(max_depth=2, random_state=3)\nscores = cross_val_score(tree, data.data, data.target, cv=3)\nprint(scores, hasattr(tree, &quot;tree_&quot;))\ntree.fit(data.data, data.target)\nprint(hasattr(tree, &quot;tree_&quot;))\n</pre><p class=\"note-label\">逐句解释</p><ol class=\"note-explanations\"><li><code>from sklearn.datasets import load_iris</code> 导入内置鸢尾花加载函数。</li><li><code>from sklearn.tree import DecisionTreeClassifier</code> 导入树分类器。</li><li><code>from sklearn.model_selection import cross_val_score</code> 导入自动完成分折训练和评分的函数。</li><li><code>data = load_iris()</code> 返回 Bunch；data.data 是特征数组，data.target 是类别数组。</li><li><code>tree = DecisionTreeClassifier(max_depth=2, random_state=3)</code> 创建参数已确定但尚未训练的树。</li><li><code>scores = cross_val_score(tree, data.data, data.target, cv=3)</code> 内部独立训练三个副本；分类器默认评分是准确率。</li><li><code>print(scores, hasattr(tree, &quot;tree_&quot;))</code> hasattr 检查属性是否存在；tree_ 在训练后才出现，这里是 False。</li><li><code>tree.fit(data.data, data.target)</code> 单独训练原始 tree；这里仅演示 fit 行为，没有进行独立测试评估。</li><li><code>print(hasattr(tree, &quot;tree_&quot;))</code> 现在为 True，原始模型已有学到的树。</li></ol><p><strong>观察输出：</strong>交叉验证后 False，手动 fit 后 True。具体分数以本机结果为准。</p><p><strong>先预测，再修改：</strong>不要执行最后的 fit，尝试 predict，观察尚未训练的报错。</p><h3>常见误区与排错</h3><p>如果先对整个开发集标准化，再交叉验证，验证折的信息已经参与计算均值和方差。应把 scaler 与模型放进 Pipeline，让每折只用自己的训练部分 fit scaler。<code>StratifiedKFold</code> 让各折类别比例尽量接近；shuffle=True 开启打乱，random_state 固定打乱结果。</p><p>整理实验表时，<code>rows.append({...})</code> 每次添加一个字典作为一行；<code>pd.DataFrame(rows)</code> 把行列表变成表。<code>sort_values([列1,列2], ascending=[False,True])</code> 先按列1降序、并列再按列2升序；<code>iloc[0]</code> 取排序后的第一行。</p><h3>合上笔记，自测一下</h3><p>你提前 fit 过的模型传给 cross_val_score，会沿用训练结果吗？为什么三次划分的最好一次分数不代表模型水平？</p><details><summary>展开核对思路</summary><p>通常的 sklearn 模型克隆只保留配置，重新训练；最好一次可能只是划分碰巧容易，需要比较平均表现和波动。</p></details><p>进一步查阅：<a href=\"https://scikit-learn.org/stable/modules/cross_validation.html\" target=\"_blank\" rel=\"noopener\">scikit-learn 官方说明</a>（选读，离线时不影响学习）。</p>",
+      "tasks": [
+        {
+          "id": "w3d3_1",
+          "title": "读实验记录，判断下一步",
+          "short": "手算迁移",
+          "description": "<p>用函数实现明确的课堂规则，练习同时查看两个分数。这些阈值只服务于本题，不是通用诊断标准。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "定义 <code>diagnose(train, valid)</code>：若 train−valid≥0.15，返回 \"overfit\"；否则若两者都小于 0.7，返回 \"underfit\"；其他返回 \"review\"。",
+            "注意条件的优先顺序。"
+          ],
+          "starter": "# 定义 diagnose(train, valid)\n",
+          "solution": "def diagnose(train, valid):\n    if train - valid >= 0.15:\n        return 'overfit'\n    if train < 0.7 and valid < 0.7:\n        return 'underfit'\n    return 'review'\nprint(diagnose(0.99, 0.72))\n",
+          "hints": [
+            "用 if 按题目顺序检查，返回字符串。",
+            "review 表示需要进一步分析，并不自动意味着模型很好。"
+          ],
+          "noteSection": "原理：欠拟合、过拟合与泛化"
+        },
+        {
+          "id": "w3d3_2",
+          "title": "用四折实验选择树的复杂度",
+          "short": "应用实验",
+          "description": "<p>换用 Wine：178 个样本、13 个化学测量特征、3 个类别。数据包仍是 Bunch；as_frame=True 保留 DataFrame 和 Series。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "仅在 X_dev/y_dev 上比较 depths=[1,2,4]，每个模型 random_state=17。",
+            "创建 results 表，列为 depth、cv_mean、cv_std，保留 depths 原顺序。评分 accuracy，使用模板中的 cv。",
+            "最佳平均分对应深度保存为 best_depth；并列取较浅者。不要用 X_test/y_test 选。"
+          ],
+          "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.datasets import load_wine\nfrom sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score\nfrom sklearn.tree import DecisionTreeClassifier\nwine = load_wine(as_frame=True)\nX_dev, X_test, y_dev, y_test = train_test_split(wine.data, wine.target, test_size=0.2, random_state=17, stratify=wine.target)\ncv = StratifiedKFold(n_splits=4, shuffle=True, random_state=17)\ndepths = [1, 2, 4]\n# 编写比较循环与选择逻辑\n",
+          "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.datasets import load_wine\nfrom sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score\nfrom sklearn.tree import DecisionTreeClassifier\nwine = load_wine(as_frame=True)\nX_dev, X_test, y_dev, y_test = train_test_split(wine.data, wine.target, test_size=0.2, random_state=17, stratify=wine.target)\ncv = StratifiedKFold(n_splits=4, shuffle=True, random_state=17)\ndepths = [1, 2, 4]\nrows = []\nfor depth in depths:\n    model = DecisionTreeClassifier(max_depth=depth, random_state=17)\n    scores = cross_val_score(model, X_dev, y_dev, cv=cv, scoring='accuracy')\n    rows.append({'depth': depth, 'cv_mean': scores.mean(), 'cv_std': scores.std()})\nresults = pd.DataFrame(rows)\nbest_depth = int(results.sort_values(['cv_mean', 'depth'], ascending=[False, True]).iloc[0]['depth'])\nprint(results, best_depth)\n",
+          "hints": [
+            "cross_val_score 会自己 fit；循环里不需要提前训练。",
+            "使用 rows 列表收集字典，然后转成 DataFrame 并排序。"
+          ],
+          "noteSection": "cross_val_score 内部到底做了什么？"
+        },
+        {
+          "id": "w3d3_3",
+          "title": "修复提前标准化造成的泄漏",
+          "short": "独立挑战",
+          "description": "<p>错误思路是先 scaler.fit_transform(X_dev)，再对变换后的数据做交叉验证。请重新建立正确的流程。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "创建 <code>pipe</code>：StandardScaler 后接 KNeighborsClassifier(n_neighbors=7)。",
+            "直接将原始 X_dev/y_dev 和 pipe 传给四折交叉验证，评分 accuracy，保存 scores。",
+            "此时不要手动 fit pipe；保存 <code>original_is_fitted</code>，用 hasattr 检查最后模型的 classes_，应为 False。"
+          ],
+          "starter": "from sklearn.datasets import load_wine\nfrom sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\nfrom sklearn.pipeline import make_pipeline\nwine = load_wine(as_frame=True)\nX_dev, X_test, y_dev, y_test = train_test_split(wine.data, wine.target, test_size=0.2, random_state=17, stratify=wine.target)\ncv = StratifiedKFold(n_splits=4, shuffle=True, random_state=17)\n# 写出安全的 Pipeline 和交叉验证\n",
+          "solution": "from sklearn.datasets import load_wine\nfrom sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.neighbors import KNeighborsClassifier\nfrom sklearn.pipeline import make_pipeline\nwine = load_wine(as_frame=True)\nX_dev, X_test, y_dev, y_test = train_test_split(wine.data, wine.target, test_size=0.2, random_state=17, stratify=wine.target)\ncv = StratifiedKFold(n_splits=4, shuffle=True, random_state=17)\npipe = make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=7))\nscores = cross_val_score(pipe, X_dev, y_dev, cv=cv, scoring='accuracy')\noriginal_is_fitted = hasattr(pipe[-1], 'classes_')\nprint(scores, original_is_fitted)\n",
+          "hints": [
+            "make_pipeline 中顺序是预处理器、分类器。",
+            "pipe[-1] 获取最后一个步骤；hasattr(obj, \"classes_\") 返回是否拥有训练后类别属性。"
+          ],
+          "noteSection": "cross_val_score 内部到底做了什么？"
+        }
+      ]
+    },
+    {
+      "short": "回归与损失",
+      "tag": "UNDERSTAND & TRANSFER",
+      "title": "让模型预测一个数值",
+      "question": "预测费用与预测类别，训练目标有什么区别？",
+      "description": "从手算到独立实验，解释模型为什么这样预测。",
+      "concept": "预测费用与预测类别，训练目标有什么区别？",
+      "notes": "<div class=\"note-roadmap\"><strong>建议 75–100 分钟，可分两次。</strong><br>先读原理并手算 → 运行小实验 → 换数据独立完成三题 → 解释结果。示例不是练习答案；题目会改变数据、目标或条件。遇到新函数先查本页逐句解释。</div><h3>原理：用一条直线预测数值</h3><p>分类回答“属于哪一类”；回归回答“数值是多少”。类别 0、1、2 只是编号，不能因为是数字就用直线拟合。费用、时长等连续数值才是今天的回归目标。预测写作 ŷ，帽子表示它是估计值；真实值写作 y。</p><p>单特征线性回归：<code>ŷ = w × x + b</code>。w 是斜率，x 增加 1 单位，预测增加 w；b 是截距，x=0 时的预测。比如 ŷ=2x+3，x=4 时预测 11。多特征时就是各特征乘自己的系数后相加，再加一个截距。LinearRegression.fit 会寻找使训练平方误差和最小的一组系数；本周无需推导矩阵求解。</p><h3>手算：为什么要把误差平方？</h3><p>残差本周定义为 <code>y − ŷ</code>。实际 [10, 14]、预测 [12, 12]，残差 [−2, 2]。直接平均会抵消成 0，掩盖错误。MSE（均方误差）=<code>Σ(yᵢ−ŷᵢ)² / n</code>，这里是 (4+4)/2=4；RMSE=√MSE=2，与目标同单位。MSE 对大错误更敏感：误差从 2 增到 4，平方损失从 4 增到 16。</p><p>训练目标小不保证验证误差小。拟合直线也有假设：若真实关系明显弯曲，直线可能欠拟合；超出训练范围的外推尤其需要谨慎。系数反映当前数据与模型下的关系，不等于因果关系。</p><h3>小实验 A · 检查一条候选直线</h3><p class=\"note-label\">可独立运行的小实验</p><pre class=\"note-code\">import numpy as np\nx = np.array([1., 2., 3.])\ny = np.array([6., 7., 10.])\npred = 2 * x + 3\nresidual = y - pred\nmse = np.mean(residual ** 2)\nprint(pred, residual, mse)\n</pre><p class=\"note-label\">逐句解释</p><ol class=\"note-explanations\"><li><code>import numpy as np</code> 导入数组工具。</li><li><code>x = np.array([1., 2., 3.])</code> 三个输入距离，一维数组方便手算。</li><li><code>y = np.array([6., 7., 10.])</code> 对应的真实费用。</li><li><code>pred = 2 * x + 3</code> 对每个 x 使用同一候选直线，预测 [5,7,9]；这是手动指定参数，尚未训练。</li><li><code>residual = y - pred</code> 真实减预测，得到 [1,0,1]。</li><li><code>mse = np.mean(residual ** 2)</code> 平方后求平均，np.mean 是对整个数组求平均。</li><li><code>print(pred, residual, mse)</code> 输出预测、误差和约 0.6667 的 MSE。</li></ol><p><strong>观察输出：</strong>MSE 为 2/3；残差不全为 0。</p><p><strong>先预测，再修改：</strong>把斜率改成 3，不要先运行，手算 MSE 是否更小。</p><h3>小实验 B · 让 fit 求出斜率与截距</h3><p class=\"note-label\">可独立运行的小实验</p><pre class=\"note-code\">from sklearn.linear_model import LinearRegression\nmodel = LinearRegression()\nmodel.fit([[0.], [1.], [2.]], [3., 5., 7.])\nprint(model.coef_, model.intercept_)\nprint(model.predict([[1.5]]))\n</pre><p class=\"note-label\">逐句解释</p><ol class=\"note-explanations\"><li><code>from sklearn.linear_model import LinearRegression</code> 导入普通最小二乘线性回归。</li><li><code>model = LinearRegression()</code> 创建回归模型，默认包含截距。</li><li><code>model.fit([[0.], [1.], [2.]], [3., 5., 7.])</code> 三行一个特征；根据数据求出斜率和截距。</li><li><code>print(model.coef_, model.intercept_)</code> coef_ 是每个特征的系数数组，intercept_ 是截距；这里约为 [2.] 和 3。</li><li><code>print(model.predict([[1.5]]))</code> 预测新的一个样本，形状 (1,1)，输出约 [6.]。</li></ol><p><strong>观察输出：</strong>浮点计算可能有极小误差，因此判题使用近似比较。</p><p><strong>先预测，再修改：</strong>把所有 y 加 5，斜率和截距分别会怎么变？</p><h3>常见误区与排错</h3><p>回归不能用 accuracy_score；默认 model.score 对 LinearRegression 是 R²，并不是 MSE。要比较误差，请明确调用 <code>mean_squared_error(y_true, y_pred)</code>。<code>DummyRegressor(strategy=\"mean\")</code> 总预测训练 y 的均值，它是判断直线有没有学习价值的基线。</p><h3>合上笔记，自测一下</h3><p>若 y 的单位是元，MSE 是什么单位？总预测训练均值的模型需不需要 fit？</p><details><summary>展开核对思路</summary><p>MSE 的单位是元²，RMSE 才是元。基线也需要 fit，才能知道训练目标的均值；不能借用验证标签的均值。</p></details><p>进一步查阅：<a href=\"https://scikit-learn.org/stable/modules/linear_model.html#ordinary-least-squares\" target=\"_blank\" rel=\"noopener\">scikit-learn 官方说明</a>（选读，离线时不影响学习）。</p>",
+      "tasks": [
+        {
+          "id": "w3d4_1",
+          "title": "写一个不会让误差抵消的评分器",
+          "short": "手算迁移",
+          "description": "<p>讲义给出了残差，这里请直接从任意真实值与预测值计算误差。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "定义 <code>mse(y_true, y_pred)</code>，接受列表或数组，返回一个数。",
+            "检查会更换数组长度与数值；不要调用 sklearn 的 MSE。"
+          ],
+          "starter": "import numpy as np\n# 定义 mse 函数\n",
+          "solution": "import numpy as np\ndef mse(y_true, y_pred):\n    residual = np.asarray(y_true) - np.asarray(y_pred)\n    return np.mean(residual ** 2)\nprint(mse([5,9], [7,7]))\n",
+          "hints": [
+            "列表不能直接相减；np.asarray 可把列表变成数组。",
+            "必须先逐项平方再求均值，不能把平均残差再平方。"
+          ],
+          "noteSection": "手算：为什么要把误差平方？"
+        },
+        {
+          "id": "w3d4_2",
+          "title": "从配送数据找出计费规则",
+          "short": "应用实验",
+          "description": "<p>输入是公里数，目标是费用。请用训练学出规律，再解释参数的单位。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "训练 LinearRegression 模型 model；保存 slope、intercept、pred。",
+            "slope 是第一个特征系数，intercept 是截距，pred 对应 new_X。",
+            "创建 explanation，至少 20 字，解释每多 1 公里对预测费用的影响及基础费用。"
+          ],
+          "starter": "import numpy as np\nfrom sklearn.linear_model import LinearRegression\nX = np.array([[1.], [3.], [5.], [7.]])\ny = np.array([8., 14., 20., 26.])  # 配送距离 -> 配送费用（教学合成数据）\nnew_X = np.array([[2.], [6.]])\n# 训练并解释参数\n",
+          "solution": "import numpy as np\nfrom sklearn.linear_model import LinearRegression\nX = np.array([[1.], [3.], [5.], [7.]])\ny = np.array([8., 14., 20., 26.])  # 配送距离 -> 配送费用（教学合成数据）\nnew_X = np.array([[2.], [6.]])\nmodel = LinearRegression().fit(X, y)\nslope = model.coef_[0]\nintercept = model.intercept_\npred = model.predict(new_X)\nexplanation = '每增加一公里，预测费用增加三元；截距五元代表这条模型中的基础费用。'\nprint(slope, intercept, pred, explanation)\n",
+          "hints": [
+            "分别查看 model.coef_ 与 model.intercept_。",
+            "斜率单位是元/公里；截距是距离为 0 时模型给出的费用。"
+          ],
+          "noteSection": "小实验 B · 让 fit 求出斜率与截距"
+        },
+        {
+          "id": "w3d4_3",
+          "title": "直线有没有胜过“总猜均值”？",
+          "short": "独立挑战",
+          "description": "<p>这次数据含噪声，不能按训练满分判断。请在同一验证集比较直线与均值基线。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "训练 linear 与 dummy；dummy 使用 strategy=\"mean\"。",
+            "保存验证预测 linear_pred、dummy_pred，以及 linear_mse、dummy_mse。",
+            "保存 winner 为 \"linear\" 或 \"dummy\"，选 MSE 较小者。"
+          ],
+          "starter": "import numpy as np\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.dummy import DummyRegressor\nfrom sklearn.metrics import mean_squared_error\nX_train = np.array([[0.], [2.], [4.], [6.]])\ny_train = np.array([4., 9., 11., 17.])\nX_valid = np.array([[1.], [3.], [5.]])\ny_valid = np.array([6., 10., 14.])\n# 比较模型在验证集的误差\n",
+          "solution": "import numpy as np\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.dummy import DummyRegressor\nfrom sklearn.metrics import mean_squared_error\nX_train = np.array([[0.], [2.], [4.], [6.]])\ny_train = np.array([4., 9., 11., 17.])\nX_valid = np.array([[1.], [3.], [5.]])\ny_valid = np.array([6., 10., 14.])\nlinear = LinearRegression().fit(X_train,y_train)\ndummy = DummyRegressor(strategy='mean').fit(X_train,y_train)\nlinear_pred = linear.predict(X_valid)\ndummy_pred = dummy.predict(X_valid)\nlinear_mse = mean_squared_error(y_valid,linear_pred)\ndummy_mse = mean_squared_error(y_valid,dummy_pred)\nwinner = 'linear' if linear_mse < dummy_mse else 'dummy'\nprint(linear_mse,dummy_mse,winner)\n",
+          "hints": [
+            "fit 用训练集，predict 用验证集。",
+            "mean_squared_error 先传真值，再传预测；用比较结果确定 winner。"
+          ],
+          "noteSection": "手算：为什么要把误差平方？"
+        }
+      ]
+    },
+    {
+      "short": "概率与逻辑回归",
+      "tag": "UNDERSTAND & TRANSFER",
+      "title": "逻辑回归为什么是分类模型？",
+      "question": "模型给出 0.7 的概率，与最终预测为 1 是同一件事吗？",
+      "description": "从手算到独立实验，解释模型为什么这样预测。",
+      "concept": "模型给出 0.7 的概率，与最终预测为 1 是同一件事吗？",
+      "notes": "<div class=\"note-roadmap\"><strong>建议 75–100 分钟，可分两次。</strong><br>先读原理并手算 → 运行小实验 → 换数据独立完成三题 → 解释结果。示例不是练习答案；题目会改变数据、目标或条件。遇到新函数先查本页逐句解释。</div><h3>原理：先打分，再把分数压到 0–1</h3><p>二分类逻辑回归先算线性分数 <code>z = w₁x₁ + … + wₘxₘ + b</code>，再经过 sigmoid：<code>p = 1 / (1 + exp(−z))</code>。exp 是以自然常数 e 为底的指数运算。z=0 时 p=0.5；z=ln(3)≈1.099 时 p=0.75；z 为负时 p&lt;0.5。它叫回归是历史命名，LogisticRegression 在 sklearn 中用于分类。</p><p>fit 会调整 w 和 b，让真实正类拥有较高概率、负类拥有较低概率。常用数据损失为二元交叉熵：<code>−[y·ln(p) + (1−y)·ln(1−p)]</code>，再对样本取平均。y=1 时只剩 −ln(p)：p=0.8 的损失约 0.223，p=0.2 的损失约 1.609；自信地预测错，惩罚更大。无需背求导，先理解优化目标。默认还包含正则化，限制系数过大；C 越小，正则化通常越强。</p><h3>概率、类别顺序与阈值</h3><p><code>predict_proba(X)</code> 返回“样本数 × 类别数”的二维数组，每行和为 1。第 j 列对应 <code>model.classes_[j]</code>，不能随便认为第二列就是你关心的类别。例如 classes_=['defect','ok'] 时，缺陷概率在第 0 列。</p><p>概率再结合阈值才变成决策。本周手动约定 <code>p ≥ t</code> 判为正类。调低 t 会使同一组概率中被判为正类的样本只增不减，可能减少漏报，但增加误报。模型概率也不是保证正确的承诺。二分类里 z=0 是线性决策边界；sigmoid 没有自动创造任意弯曲的边界。</p><h3>小实验 A · 观察 sigmoid 的形状</h3><p class=\"note-label\">可独立运行的小实验</p><pre class=\"note-code\">import numpy as np\nz = np.array([-2., 0., 2.])\np = 1 / (1 + np.exp(-z))\nprint(p)\nprint((p &gt;= 0.6).astype(int))\n</pre><p class=\"note-label\">逐句解释</p><ol class=\"note-explanations\"><li><code>import numpy as np</code> 导入数值工具，np.exp 计算指数函数。</li><li><code>z = np.array([-2., 0., 2.])</code> 三个模型原始分数，尚未变成概率。</li><li><code>p = 1 / (1 + np.exp(-z))</code> 按数组每一项计算 sigmoid；括号明确整个分母。</li><li><code>print(p)</code> 显示约 [0.1192,0.5,0.8808]，分数越大概率越高。</li><li><code>print((p &gt;= 0.6).astype(int))</code> 比较得到布尔数组，再把 False/True 转成 0/1；这里阈值是 0.6。</li></ol><p><strong>观察输出：</strong>概率位于 0–1；按 0.6 阈值预测 [0,0,1]。</p><p><strong>先预测，再修改：</strong>改成阈值 0.4，哪些样本的类别会改变？</p><h3>小实验 B · 不猜测概率列的顺序</h3><p class=\"note-label\">可独立运行的小实验</p><pre class=\"note-code\">from sklearn.linear_model import LogisticRegression\nmodel = LogisticRegression()\nmodel.fit([[-2.], [-1.], [1.], [2.]], [0, 0, 1, 1])\nprobabilities = model.predict_proba([[-1.5], [1.5]])\nprint(model.classes_)\nprint(probabilities)\n</pre><p class=\"note-label\">逐句解释</p><ol class=\"note-explanations\"><li><code>from sklearn.linear_model import LogisticRegression</code> 导入逻辑回归分类器。</li><li><code>model = LogisticRegression()</code> 创建默认带正则化的模型。</li><li><code>model.fit([[-2.], [-1.], [1.], [2.]], [0, 0, 1, 1])</code> 输入一列特征，训练标签为两类；学习系数与截距。</li><li><code>probabilities = model.predict_proba([[-1.5], [1.5]])</code> 返回 2 行 2 列，分别对应两个新样本的两种类别概率。</li><li><code>print(model.classes_)</code> 打印列顺序 [0,1]，因此本例第 1 列才是类别 1。</li><li><code>print(probabilities)</code> 每行相加约为 1；第一行倾向 0，第二行倾向 1。</li></ol><p><strong>观察输出：</strong>这是模型估计的概率，数值以本机输出为准。</p><p><strong>先预测，再修改：</strong>把标签改成文字，再打印 classes_，先确定你关心的标签在哪列。</p><h3>常见误区与排错</h3><p><code>np.flatnonzero(condition)</code> 返回一维布尔条件为 True 的位置；用它寻找 classes_ 中目标标签的位置。<code>[:, j]</code> 表示所有样本的第 j 列。<code>astype(int)</code> 是类型转换，不是再次训练。max_iter 控制优化最多迭代次数；如果出现不收敛提示，可以先检查缩放，再合理增加迭代次数。</p><h3>合上笔记，自测一下</h3><p>调低阈值需要重新 fit 吗？只有类别而没有概率时，还能任意调整阈值吗？</p><details><summary>展开核对思路</summary><p>对固定模型的已有概率换阈值，不需要重新 fit。只有 0/1 类别时，概率大小已经丢失，不能据此重建不同阈值的结果。</p></details><p>进一步查阅：<a href=\"https://scikit-learn.org/stable/modules/linear_model.html#logistic-regression\" target=\"_blank\" rel=\"noopener\">scikit-learn 官方说明</a>（选读，离线时不影响学习）。</p>",
+      "tasks": [
+        {
+          "id": "w3d5_1",
+          "title": "从线性分数算概率",
+          "short": "手算迁移",
+          "description": "<p>讲义给固定数组，这里写能处理不同数组的函数，随后用一组新的双特征数据计算结果。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "定义 sigmoid(z)，支持 NumPy 数组。",
+            "根据模板中 X、w、b 计算 scores = X @ w + b，再计算 probabilities。@ 是矩阵乘法：每行分别与 w 对应相乘再相加。"
+          ],
+          "starter": "import numpy as np\nX = np.array([[1.,0.],[0.,1.],[2.,1.]])\nw = np.array([2.,-1.])\nb = -0.5\n# 定义 sigmoid，再计算 scores、probabilities\n",
+          "solution": "import numpy as np\nX = np.array([[1.,0.],[0.,1.],[2.,1.]])\nw = np.array([2.,-1.])\nb = -0.5\ndef sigmoid(z):\n    return 1 / (1 + np.exp(-np.asarray(z)))\nscores = X @ w + b\nprobabilities = sigmoid(scores)\nprint(scores, probabilities)\n",
+          "hints": [
+            "可以先手算第一行：1×2 + 0×(−1) − 0.5。",
+            "函数中 np.asarray(z) 统一输入为数组；np.exp 支持按元素运算。"
+          ],
+          "noteSection": "小实验 A · 观察 sigmoid 的形状"
+        },
+        {
+          "id": "w3d5_2",
+          "title": "缺陷概率到底是哪一列？",
+          "short": "应用实验",
+          "description": "<p>这次目标标签改为文字。盲目复制 [:,1] 将拿到相反类别的概率。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "训练 LogisticRegression 模型 model，max_iter=1000。",
+            "根据 model.classes_ 找到 \"defect\" 对应的位置 defect_col。",
+            "创建 defect_prob，为 new_X 的缺陷概率一维数组。"
+          ],
+          "starter": "import numpy as np\nfrom sklearn.linear_model import LogisticRegression\nX = np.array([[-3.],[-2.],[-1.],[1.],[2.],[3.]])\ny = np.array(['ok','ok','ok','defect','defect','defect'])\nnew_X = np.array([[-2.5],[0.5],[2.5]])\n# 先查看 classes_，再提取目标类别概率\n",
+          "solution": "import numpy as np\nfrom sklearn.linear_model import LogisticRegression\nX = np.array([[-3.],[-2.],[-1.],[1.],[2.],[3.]])\ny = np.array(['ok','ok','ok','defect','defect','defect'])\nnew_X = np.array([[-2.5],[0.5],[2.5]])\nmodel = LogisticRegression(max_iter=1000).fit(X,y)\ndefect_col = np.flatnonzero(model.classes_ == 'defect')[0]\ndefect_prob = model.predict_proba(new_X)[:,defect_col]\nprint(model.classes_, defect_prob)\n",
+          "hints": [
+            "先 print(model.classes_)，看 defect 是第几列。",
+            "np.flatnonzero(model.classes_ == \"defect\")[0] 得到位置，再用 [:,位置]。"
+          ],
+          "noteSection": "概率、类别顺序与阈值"
+        },
+        {
+          "id": "w3d5_3",
+          "title": "同一个模型，两套报警规则",
+          "short": "独立挑战",
+          "description": "<p>固定概率不变，只改阈值，观察报警数量。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "定义 apply_threshold(probabilities, threshold)，返回整数 0/1 数组，概率等于阈值时也报警。",
+            "模板数组在阈值 0.3 和 0.7 下的预测保存为 low_pred、high_pred。"
+          ],
+          "starter": "import numpy as np\nprobabilities = np.array([0.12,0.30,0.45,0.70,0.91])\n# 写函数并应用两个阈值\n",
+          "solution": "import numpy as np\nprobabilities = np.array([0.12,0.30,0.45,0.70,0.91])\ndef apply_threshold(probabilities, threshold):\n    return (np.asarray(probabilities) >= threshold).astype(int)\nlow_pred = apply_threshold(probabilities,0.3)\nhigh_pred = apply_threshold(probabilities,0.7)\nprint(low_pred, high_pred)\n",
+          "hints": [
+            "probabilities >= threshold 会得到布尔数组。",
+            "再 .astype(int) 得到 0/1；别遗漏刚好等于阈值的样本。"
+          ],
+          "noteSection": "概率、类别顺序与阈值"
+        }
+      ]
+    },
+    {
+      "short": "不平衡与阈值",
+      "tag": "UNDERSTAND & TRANSFER",
+      "title": "准确率可能掩盖了什么？",
+      "question": "漏掉缺陷与误报正常件，应该如何分别衡量？",
+      "description": "从手算到独立实验，解释模型为什么这样预测。",
+      "concept": "漏掉缺陷与误报正常件，应该如何分别衡量？",
+      "notes": "<div class=\"note-roadmap\"><strong>建议 75–100 分钟，可分两次。</strong><br>先读原理并手算 → 运行小实验 → 换数据独立完成三题 → 解释结果。示例不是练习答案；题目会改变数据、目标或条件。遇到新函数先查本页逐句解释。</div><h3>原理：先确定正类，再讨论错误</h3><p>这里是教学用的质量检查：1 表示缺陷（正类），0 表示正常（负类）。TP：缺陷被报成缺陷；FP：正常件被误报；FN：缺陷漏报；TN：正常件正确放行。记号里的 Positive/Negative 指预测，True/False 指预测是否正确。</p><table><thead><tr><th></th><th>预测 0</th><th>预测 1</th></tr></thead><tbody><tr><th>真实 0</th><td>TN</td><td>FP</td></tr><tr><th>真实 1</th><td>FN</td><td>TP</td></tr></tbody></table><p>如果 100 件里只有 5 个缺陷，总猜正常也有 95% 准确率，但缺陷一个都抓不到。因此先问任务关心什么，再选指标。</p><h3>手算：Precision、Recall 与 F1</h3><p><code>Precision = TP / (TP + FP)</code>：报出的缺陷里有多少是真的，分母是所有报警。<code>Recall = TP / (TP + FN)</code>：真正缺陷里抓到了多少，分母是所有真实缺陷。TP=3、FP=1、FN=2 时，Precision=3/4=0.75，Recall=3/5=0.6。</p><p><code>F1 = 2PR/(P+R) = 2TP/(2TP+FP+FN)</code>，上述例子是 6/9≈0.667。它综合两项，但忽略 TN，不是所有业务的通用最优目标。当分母为 0 时，本周约定该指标记 0；sklearn 用 zero_division=0 明确这个规则。</p><p>Balanced accuracy 是各类别召回率的平均，二分类就是 (TPR+TNR)/2。类别不平衡时，它让两个类别各占相同权重；不会因为正常件多就忽略缺陷。本周最后项目用它来比较模型。</p><h3>阈值是验证集上的一个选择</h3><p>固定模型概率后，用验证集遍历阈值，按预先指定的指标选。降低阈值时召回率不会下降，但精确率并不保证严格单调变化，因为新增报警可能有真有假。选阈值不能查看最终测试标签；选完只评估一次测试集，并接受可能较低的分数。</p><h3>小实验 A · 把混淆矩阵拆开看</h3><p class=\"note-label\">可独立运行的小实验</p><pre class=\"note-code\">from sklearn.metrics import confusion_matrix\nactual = [0, 0, 0, 1, 1, 1]\npredicted = [0, 1, 0, 1, 0, 1]\nmatrix = confusion_matrix(actual, predicted, labels=[0, 1])\ntn, fp, fn, tp = matrix.ravel()\nprint(matrix, tn, fp, fn, tp)\n</pre><p class=\"note-label\">逐句解释</p><ol class=\"note-explanations\"><li><code>from sklearn.metrics import confusion_matrix</code> 导入混淆矩阵函数。</li><li><code>actual = [0, 0, 0, 1, 1, 1]</code> 六个真实标签，0 正常、1 缺陷。</li><li><code>predicted = [0, 1, 0, 1, 0, 1]</code> 同一顺序的模型预测。</li><li><code>matrix = confusion_matrix(actual, predicted, labels=[0, 1])</code> 固定类别顺序，行是真实、列是预测；得到 2×2 矩阵。</li><li><code>tn, fp, fn, tp = matrix.ravel()</code> ravel 按行展开二维数组，四个变量分别接住 TN、FP、FN、TP。</li><li><code>print(matrix, tn, fp, fn, tp)</code> 输出 [[2,1],[1,2]] 及 2、1、1、2。</li></ol><p><strong>观察输出：</strong>正常件误报 1 个、缺陷漏报 1 个。</p><p><strong>先预测，再修改：</strong>把第二个预测从 1 改成 0，哪个计数会下降、哪个会增加？</p><h3>小实验 B · 同一概率，不同召回</h3><p class=\"note-label\">可独立运行的小实验</p><pre class=\"note-code\">import numpy as np\nfrom sklearn.metrics import precision_score, recall_score\nactual = np.array([0, 1, 1, 0])\nprob = np.array([0.2, 0.4, 0.8, 0.7])\npred = (prob &gt;= 0.5).astype(int)\nprint(precision_score(actual, pred, zero_division=0))\nprint(recall_score(actual, pred, zero_division=0))\n</pre><p class=\"note-label\">逐句解释</p><ol class=\"note-explanations\"><li><code>import numpy as np</code> 导入数组工具。</li><li><code>from sklearn.metrics import precision_score, recall_score</code> 导入精确率与召回率计算函数。</li><li><code>actual = np.array([0, 1, 1, 0])</code> 真实标签，正类是数字 1。</li><li><code>prob = np.array([0.2, 0.4, 0.8, 0.7])</code> 对应的模型缺陷概率。</li><li><code>pred = (prob &gt;= 0.5).astype(int)</code> 按 0.5 阈值生成 [0,0,1,1]。</li><li><code>print(precision_score(actual, pred, zero_division=0))</code> 两次报警中只有一次正确，精确率 0.5；参数指定分母为 0 时的约定。</li><li><code>print(recall_score(actual, pred, zero_division=0))</code> 两个真实缺陷只抓到一个，召回率 0.5。</li></ol><p><strong>观察输出：</strong>两个指标在这个例子都为 0.5，但分母的含义不同。</p><p><strong>先预测，再修改：</strong>把阈值改为 0.3，先数 TP/FP/FN，再验证两个指标。</p><h3>常见误区与排错</h3><p>筛选多个条件时用 <code>(条件1) &amp; (条件2)</code>；不能用 Python 的 and 比较整个 Series。筛选后要保留 item 对应关系，不要只排序某一列。纯自动文字检查不能判断解释是否真的正确，本周自测需要你亲自对照定义。</p><h3>合上笔记，自测一下</h3><p>为什么全预测为正常可能准确率高、F1 却为 0？如果题目要求“召回至少 0.9，再尽量减少误报”，能直接选 F1 最大吗？</p><details><summary>展开核对思路</summary><p>前者完全忽略少数正类；后者应先过滤召回合格的阈值，再按误报数量或精确率选择，目标不同，选择逻辑也不同。</p></details><p>进一步查阅：<a href=\"https://scikit-learn.org/stable/modules/model_evaluation.html#classification-metrics\" target=\"_blank\" rel=\"noopener\">scikit-learn 官方说明</a>（选读，离线时不影响学习）。</p>",
+      "tasks": [
+        {
+          "id": "w3d6_1",
+          "title": "不借助现成函数统计漏报与误报",
+          "short": "手算迁移",
+          "description": "<p>写出能用于任意 0/1 标签数组的函数，检查会包含全部预测正常的情况。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "定义 binary_counts(actual, predicted)，返回字典，键为 \"tp\"、\"fp\"、\"fn\"、\"tn\"，值为计数。",
+            "支持 Python 列表和数组，不能调用 confusion_matrix。"
+          ],
+          "starter": "import numpy as np\n# 定义 binary_counts\n",
+          "solution": "import numpy as np\ndef binary_counts(actual, predicted):\n    a = np.asarray(actual)\n    p = np.asarray(predicted)\n    return {'tp': int(((a==1)&(p==1)).sum()), 'fp': int(((a==0)&(p==1)).sum()), 'fn': int(((a==1)&(p==0)).sum()), 'tn': int(((a==0)&(p==0)).sum())}\nprint(binary_counts([0,1,1],[1,0,1]))\n",
+          "hints": [
+            "例如 FP 同时满足 actual==0、predicted==1。",
+            "每个比较用括号包住，用 & 合并，.sum() 统计 True 数量。"
+          ],
+          "noteSection": "原理：先确定正类，再讨论错误"
+        },
+        {
+          "id": "w3d6_2",
+          "title": "给阈值写一张验证成绩单",
+          "short": "应用实验",
+          "description": "<p>这里有多个候选阈值，不能只试讲义里的 0.5。目标明确为 F1 最大，并列选更高阈值。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "创建 report，列为 threshold、precision、recall、f1，按 thresholds 顺序排列。",
+            "所有指标指定 zero_division=0，正类是 1。",
+            "创建 best_threshold；只能使用模板中的验证标签选。"
+          ],
+          "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.metrics import precision_score, recall_score, f1_score\ny_valid = np.array([0, 0, 1, 0, 1, 1, 0, 1])\np_valid = np.array([.1, .4, .35, .6, .55, .8, .2, .9])\nthresholds = [.3, .5, .7]\n# 遍历阈值、生成表格并选择\n",
+          "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.metrics import precision_score, recall_score, f1_score\ny_valid = np.array([0, 0, 1, 0, 1, 1, 0, 1])\np_valid = np.array([.1, .4, .35, .6, .55, .8, .2, .9])\nthresholds = [.3, .5, .7]\nrows = []\nfor t in thresholds:\n    pred = (p_valid >= t).astype(int)\n    rows.append({'threshold': t, 'precision': precision_score(y_valid,pred,zero_division=0), 'recall': recall_score(y_valid,pred,zero_division=0), 'f1': f1_score(y_valid,pred,zero_division=0)})\nreport = pd.DataFrame(rows)\nbest_threshold = float(report.sort_values(['f1','threshold'],ascending=[False,False]).iloc[0]['threshold'])\nprint(report, best_threshold)\n",
+          "hints": [
+            "循环里生成一行字典，最后 pd.DataFrame(rows)。",
+            "sort_values 的两个 ascending 都是 False，之后取第一行。"
+          ],
+          "noteSection": "阈值是验证集上的一个选择"
+        },
+        {
+          "id": "w3d6_3",
+          "title": "找出需要人工复盘的样本",
+          "short": "独立挑战",
+          "description": "<p>不能只报一个平均分。请分别列出被误报的正常件与漏掉的缺陷件。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "按阈值 0.5 在 audit 新增 predicted 列。",
+            "创建 false_positives 和 false_negatives 两张表，保留 audit 全部四列与原始行索引。",
+            "不要把实际缺陷但预测正确的样本混进漏报表。"
+          ],
+          "starter": "import numpy as np\nimport pandas as pd\naudit = pd.DataFrame({'item': ['A','B','C','D','E','F'], 'actual': [0,1,0,1,1,0], 'probability': [.7,.2,.1,.8,.4,.6]})\n# 生成预测，按两种错误分别筛选\n",
+          "solution": "import numpy as np\nimport pandas as pd\naudit = pd.DataFrame({'item': ['A','B','C','D','E','F'], 'actual': [0,1,0,1,1,0], 'probability': [.7,.2,.1,.8,.4,.6]})\naudit['predicted'] = (audit['probability'] >= 0.5).astype(int)\nfalse_positives = audit.loc[(audit['actual']==0)&(audit['predicted']==1)].copy()\nfalse_negatives = audit.loc[(audit['actual']==1)&(audit['predicted']==0)].copy()\nprint(false_positives)\nprint(false_negatives)\n",
+          "hints": [
+            "用 .loc[布尔条件] 筛选整行，两个条件之间用 &。",
+            "分别检查 item：误报应是正常件，漏报应是真实缺陷件。"
+          ],
+          "noteSection": "原理：先确定正类，再讨论错误"
+        }
+      ]
+    },
+    {
+      "short": "独立诊断项目",
+      "tag": "UNDERSTAND & TRANSFER",
+      "title": "交付一个有依据的分类实验",
+      "question": "你能同时说明数据怎样分、模型怎样选、错误在哪里吗？",
+      "description": "从手算到独立实验，解释模型为什么这样预测。",
+      "concept": "你能同时说明数据怎样分、模型怎样选、错误在哪里吗？",
+      "notes": "<div class=\"note-roadmap\"><strong>建议 75–100 分钟，可分两次。</strong><br>先读原理并手算 → 运行小实验 → 换数据独立完成三题 → 解释结果。示例不是练习答案；题目会改变数据、目标或条件。遇到新函数先查本页逐句解释。</div><h3>项目数据：合成的工厂检测任务</h3><p>本周不用 Iris，改用可复现的教学合成数据。360 行表示 360 件产品，6 列 sensor_0…sensor_5 表示六个传感器读数；标签 1 为缺陷、0 为正常。它不对应真实工厂，分数不能直接代表实际业务效果。</p><p><code>make_classification</code> 直接返回特征数组与标签数组两个对象，不是 Bunch。n_informative=4 表示四个特征参与构造分类信息；n_redundant=0 不添加由其他特征线性组合的冗余列；默认会打乱特征顺序，所以不能认定前四列必定最有用。weights=[0.75,0.25] 给出初始类别比例；flip_y=0.03 会随机重置少部分标签，所以最终计数不一定恰好 75%/25%。class_sep 控制类别的分离程度；random_state 固定本次生成。</p><h3>实验协议：训练选模型，验证选阈值，测试只验收</h3><p>先取 20% 为测试集：72 行。剩下 288 行中的 25% 为验证集：72 行。最终训练/验证/测试为 216/72/72，也就是总数据的 60%/20%/20%。每次 stratify 使用与当次 X 对应的 y；必须同时拆 X 与 y，才能保持样本和答案对齐。</p><p>在 216 行训练数据内做三折交叉验证，比较树与标准化后的逻辑回归，指标为 balanced accuracy。此处比较模型的默认类别决策。选定后，在全部 216 行上 fit；只在验证集选 F1 最好的阈值；保持模型和阈值固定，最后评价测试集。这是分阶段选择，不声称得到所有模型×阈值组合中的全局最优。</p><p>本周不要在选阈值后再合并训练与验证数据重新 fit：那会改变模型输出的概率，旧阈值未必仍合适。以后会学习更完整的重训练和校准策略。测试分数再低也不回头按它选参数。</p><h3>新语法与交付格式</h3><p><code>{'logistic': model1, 'tree': model2}</code> 是字典；<code>for name, model in candidates.items()</code> 每次取一个名称和对应模型。元组 <code>(score, threshold)</code> 会先比较第一个元素，并列再比较第二个，因此 max 可以表达“最高分，并列取最高阈值”。列表推导式 <code>[表达式 for t in thresholds]</code> 是把逐个结果收集成列表的简写，可以改写成普通 for 循环。</p><p><code>to_csv(..., index_label='sample_id')</code> 把原始索引作为有名字的一列导出。保留原始样本索引，才能回到输入行定位错误。不会因为运行完成就自动生成报告，你必须明确创建预测表和指标字典。</p><h3>小实验 A · 核对两次划分的比例</h3><p class=\"note-label\">可独立运行的小实验</p><pre class=\"note-code\">import numpy as np\nfrom sklearn.model_selection import train_test_split\nids = np.arange(20)\ndev, test = train_test_split(ids, test_size=0.2, random_state=8)\ntrain, valid = train_test_split(dev, test_size=0.25, random_state=8)\nprint(len(train), len(valid), len(test))\nprint(set(train) &amp; set(test))\n</pre><p class=\"note-label\">逐句解释</p><ol class=\"note-explanations\"><li><code>import numpy as np</code> 导入数组工具。</li><li><code>from sklearn.model_selection import train_test_split</code> 导入同步划分多个数组的函数。</li><li><code>ids = np.arange(20)</code> 用 20 个样本编号简化观察，从 0 到 19。</li><li><code>dev, test = train_test_split(ids, test_size=0.2, random_state=8)</code> 先封存 4 个编号作为测试。这里只有编号，未演示分层。</li><li><code>train, valid = train_test_split(dev, test_size=0.25, random_state=8)</code> 剩余 16 个中取 4 个验证，最后训练剩 12 个。</li><li><code>print(len(train), len(valid), len(test))</code> 检查数量 12、4、4，即 60%/20%/20%。</li><li><code>print(set(train) &amp; set(test))</code> set 转集合，& 求交集；空集合说明没有共享编号。</li></ol><p><strong>观察输出：</strong>数量是 12/4/4，交集为空。</p><p><strong>先预测，再修改：</strong>若第二次也用 test_size=0.2，总体比例还会是 60/20/20 吗？</p><h3>小实验 B · 将选择规则写清楚</h3><p class=\"note-label\">可独立运行的小实验</p><pre class=\"note-code\">import pandas as pd\nexperiments = pd.DataFrame({&#x27;setting&#x27;:[&#x27;A&#x27;,&#x27;B&#x27;,&#x27;C&#x27;],&#x27;score&#x27;:[.72,.81,.81],&#x27;size&#x27;:[4,8,3]})\nordered = experiments.sort_values([&#x27;score&#x27;,&#x27;size&#x27;], ascending=[False,True])\nchosen = ordered.iloc[0][&#x27;setting&#x27;]\nprint(ordered, chosen)\n</pre><p class=\"note-label\">逐句解释</p><ol class=\"note-explanations\"><li><code>import pandas as pd</code> 导入表格工具。</li><li><code>experiments = pd.DataFrame({&#x27;setting&#x27;:[&#x27;A&#x27;,&#x27;B&#x27;,&#x27;C&#x27;],&#x27;score&#x27;:[.72,.81,.81],&#x27;size&#x27;:[4,8,3]})</code> 三条示意实验记录；score 是验证分数，size 表示模型复杂度。</li><li><code>ordered = experiments.sort_values([&#x27;score&#x27;,&#x27;size&#x27;], ascending=[False,True])</code> 先按分数从大到小；B、C 并列时按复杂度从小到大。</li><li><code>chosen = ordered.iloc[0][&#x27;setting&#x27;]</code> 第一行是 C，取 setting 字段得到字符串。</li><li><code>print(ordered, chosen)</code> 展示排序表和选择结果；这只是选择逻辑，不涉及任何测试集。</li></ol><p><strong>观察输出：</strong>选 C：验证同分时取复杂度较小者。</p><p><strong>先预测，再修改：</strong>如果任务改成并列选择 setting 按字母顺序较小者，排序依据要怎样变？</p><h3>常见误区与排错</h3><p>数据都是本地生成，不需要网络。每题独立运行：后题模板会重新提供数据准备，变量不会从上一题保留。第 3 题需要把你在第 2 题写的选择逻辑重新组合进来。自动检查接受不同写法和等价结果；不会要求模型必须达到一个幸运的高分。</p><h3>合上笔记，自测一下</h3><p>你最终选择了哪个模型和阈值？它更容易漏报还是误报？下一轮要改什么，并怎样保证不依据测试成绩调参？</p><details><summary>复盘清单</summary><p>记录训练内 CV 表、验证阈值表、一次测试指标和样本预测文件。先由任务目标决定下一轮实验；如已反复查看测试集指导修改，需要新的独立测试数据，旧数据不再提供无偏验收。</p></details><p>进一步查阅：<a href=\"https://scikit-learn.org/stable/modules/cross_validation.html\" target=\"_blank\" rel=\"noopener\">scikit-learn 官方说明</a>（选读，离线时不影响学习）。</p>",
+      "tasks": [
+        {
+          "id": "w3d7_1",
+          "title": "建立没有交叉污染的三份数据",
+          "short": "手算迁移",
+          "description": "<p>按协议准备训练、验证、测试数据，并主动检查行号。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "先从 X/y 封存 20% 测试集，变量 X_dev、X_test、y_dev、y_test。",
+            "再从开发集划分 25% 为验证，变量 X_train、X_valid、y_train、y_valid。两次 random_state=31，按当次标签 stratify。",
+            "创建 overlaps 字典，键 train_valid、train_test、valid_test，值为对应行索引交集的数量。"
+          ],
+          "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.datasets import make_classification\nfrom sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.metrics import balanced_accuracy_score, precision_score, recall_score, f1_score\nfeatures, labels = make_classification(n_samples=360, n_features=6, n_informative=4, n_redundant=0, weights=[0.75,0.25], class_sep=1.0, flip_y=0.03, random_state=31)\nX = pd.DataFrame(features, columns=[f'sensor_{i}' for i in range(6)])\ny = pd.Series(labels, name='defect')\n# 两次同步划分，然后检查交集\n",
+          "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.datasets import make_classification\nfrom sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.metrics import balanced_accuracy_score, precision_score, recall_score, f1_score\nfeatures, labels = make_classification(n_samples=360, n_features=6, n_informative=4, n_redundant=0, weights=[0.75,0.25], class_sep=1.0, flip_y=0.03, random_state=31)\nX = pd.DataFrame(features, columns=[f'sensor_{i}' for i in range(6)])\ny = pd.Series(labels, name='defect')\nX_dev, X_test, y_dev, y_test = train_test_split(X,y,test_size=0.2,random_state=31,stratify=y)\nX_train, X_valid, y_train, y_valid = train_test_split(X_dev,y_dev,test_size=0.25,random_state=31,stratify=y_dev)\noverlaps = {'train_valid':len(set(X_train.index)&set(X_valid.index)), 'train_test':len(set(X_train.index)&set(X_test.index)), 'valid_test':len(set(X_valid.index)&set(X_test.index))}\nprint(X_train.shape,X_valid.shape,X_test.shape,overlaps)\n",
+          "hints": [
+            "同时把 X 和 y 交给 train_test_split，接住四个返回值。",
+            "set(X_train.index) & set(X_valid.index) 得到交集，len 计数。"
+          ],
+          "noteSection": "实验协议：训练选模型，验证选阈值，测试只验收"
+        },
+        {
+          "id": "w3d7_2",
+          "title": "公平比较两种模型的原理选择",
+          "short": "应用实验",
+          "description": "<p>给定两个候选：线性概率模型与能分段提问的树。不能先看测试分数再决定喜欢哪一个。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "模板已提供划分、candidates 和 cv；用 X_train/y_train 做三折验证，scoring=\"balanced_accuracy\"。",
+            "comparison 表包含 model、cv_mean，按 candidates 的顺序记录。",
+            "best_name 保存平均分最高者名称，并列按名称字母顺序升序。这里不需要 fit 原始候选。"
+          ],
+          "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.datasets import make_classification\nfrom sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.metrics import balanced_accuracy_score, precision_score, recall_score, f1_score\nfeatures, labels = make_classification(n_samples=360, n_features=6, n_informative=4, n_redundant=0, weights=[0.75,0.25], class_sep=1.0, flip_y=0.03, random_state=31)\nX = pd.DataFrame(features, columns=[f'sensor_{i}' for i in range(6)])\ny = pd.Series(labels, name='defect')\nX_dev, X_test, y_dev, y_test = train_test_split(X,y,test_size=0.2,random_state=31,stratify=y)\nX_train, X_valid, y_train, y_valid = train_test_split(X_dev,y_dev,test_size=0.25,random_state=31,stratify=y_dev)\ncandidates = {\n    'logistic': make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, random_state=31)),\n    'tree': DecisionTreeClassifier(max_depth=4, min_samples_leaf=5, random_state=31)\n}\ncv = StratifiedKFold(n_splits=3,shuffle=True,random_state=31)\n# 在训练集内部比较并选择\n",
+          "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.datasets import make_classification\nfrom sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.metrics import balanced_accuracy_score, precision_score, recall_score, f1_score\nfeatures, labels = make_classification(n_samples=360, n_features=6, n_informative=4, n_redundant=0, weights=[0.75,0.25], class_sep=1.0, flip_y=0.03, random_state=31)\nX = pd.DataFrame(features, columns=[f'sensor_{i}' for i in range(6)])\ny = pd.Series(labels, name='defect')\nX_dev, X_test, y_dev, y_test = train_test_split(X,y,test_size=0.2,random_state=31,stratify=y)\nX_train, X_valid, y_train, y_valid = train_test_split(X_dev,y_dev,test_size=0.25,random_state=31,stratify=y_dev)\ncandidates = {\n    'logistic': make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, random_state=31)),\n    'tree': DecisionTreeClassifier(max_depth=4, min_samples_leaf=5, random_state=31)\n}\ncv = StratifiedKFold(n_splits=3,shuffle=True,random_state=31)\nrows = []\nfor name, model in candidates.items():\n    scores = cross_val_score(model,X_train,y_train,cv=cv,scoring='balanced_accuracy')\n    rows.append({'model':name,'cv_mean':scores.mean()})\ncomparison = pd.DataFrame(rows)\nbest_name = comparison.sort_values(['cv_mean','model'],ascending=[False,True]).iloc[0]['model']\nprint(comparison,best_name)\n",
+          "hints": [
+            "字典 .items() 遍历名称和模型；每轮将 scores.mean() 存入一行。",
+            "Pipeline 放在 cross_val_score 内，保证每折单独学习标准化参数。"
+          ],
+          "noteSection": "新语法与交付格式"
+        },
+        {
+          "id": "w3d7_3",
+          "title": "固定模型与阈值，交付预测文件",
+          "short": "综合交付",
+          "description": "<p>组合前面学到的流程。不能只复制某一个讲义示例；你需要完成模型选择、阈值选择、验收和导出。</p><p>每次运行都是新环境；模板已提供本题数据。检查关注结果和行为，不要求与参考解法写法一致。</p>",
+          "requirements": [
+            "复用上一题逻辑得到 comparison 与 best_name；model 使用选中的候选，在全部 X_train/y_train 上 fit。",
+            "验证集上比较阈值 [0.3,0.5,0.7]，按正类 F1 选 best_threshold，并列取较高者。",
+            "用固定模型与阈值预测测试集，保存 p_test 和 y_pred。",
+            "创建 test_report 字典，键 balanced_accuracy、precision、recall、f1；后三项 zero_division=0。",
+            "创建 delivery 表，保留 y_test 原索引，列 actual、probability、predicted；导出 week3_predictions.csv，index_label=\"sample_id\"。"
+          ],
+          "starter": "import numpy as np\nimport pandas as pd\nfrom sklearn.datasets import make_classification\nfrom sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.metrics import balanced_accuracy_score, precision_score, recall_score, f1_score\nfeatures, labels = make_classification(n_samples=360, n_features=6, n_informative=4, n_redundant=0, weights=[0.75,0.25], class_sep=1.0, flip_y=0.03, random_state=31)\nX = pd.DataFrame(features, columns=[f'sensor_{i}' for i in range(6)])\ny = pd.Series(labels, name='defect')\nX_dev, X_test, y_dev, y_test = train_test_split(X,y,test_size=0.2,random_state=31,stratify=y)\nX_train, X_valid, y_train, y_valid = train_test_split(X_dev,y_dev,test_size=0.25,random_state=31,stratify=y_dev)\ncandidates = {\n    'logistic': make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, random_state=31)),\n    'tree': DecisionTreeClassifier(max_depth=4, min_samples_leaf=5, random_state=31)\n}\ncv = StratifiedKFold(n_splits=3,shuffle=True,random_state=31)\n# 1. 组合上一题的模型选择代码\n# 2. fit 选中的模型，使用验证集选择阈值\n# 3. 固定设置后评价测试集，导出文件\n",
+          "solution": "import numpy as np\nimport pandas as pd\nfrom sklearn.datasets import make_classification\nfrom sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score\nfrom sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.metrics import balanced_accuracy_score, precision_score, recall_score, f1_score\nfeatures, labels = make_classification(n_samples=360, n_features=6, n_informative=4, n_redundant=0, weights=[0.75,0.25], class_sep=1.0, flip_y=0.03, random_state=31)\nX = pd.DataFrame(features, columns=[f'sensor_{i}' for i in range(6)])\ny = pd.Series(labels, name='defect')\nX_dev, X_test, y_dev, y_test = train_test_split(X,y,test_size=0.2,random_state=31,stratify=y)\nX_train, X_valid, y_train, y_valid = train_test_split(X_dev,y_dev,test_size=0.25,random_state=31,stratify=y_dev)\ncandidates = {\n    'logistic': make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, random_state=31)),\n    'tree': DecisionTreeClassifier(max_depth=4, min_samples_leaf=5, random_state=31)\n}\ncv = StratifiedKFold(n_splits=3,shuffle=True,random_state=31)\nrows = []\nfor name, model in candidates.items():\n    scores = cross_val_score(model,X_train,y_train,cv=cv,scoring='balanced_accuracy')\n    rows.append({'model':name,'cv_mean':scores.mean()})\ncomparison = pd.DataFrame(rows)\nbest_name = comparison.sort_values(['cv_mean','model'],ascending=[False,True]).iloc[0]['model']\nmodel = candidates[best_name]\nmodel.fit(X_train,y_train)\npositive_col = np.flatnonzero(model.classes_ == 1)[0]\np_valid = model.predict_proba(X_valid)[:,positive_col]\nthresholds = [0.3,0.5,0.7]\nthreshold_scores = [(f1_score(y_valid,(p_valid>=t).astype(int),zero_division=0),t) for t in thresholds]\nbest_threshold = max(threshold_scores)[1]\np_test = model.predict_proba(X_test)[:,positive_col]\ny_pred = (p_test>=best_threshold).astype(int)\ntest_report = {'balanced_accuracy':balanced_accuracy_score(y_test,y_pred), 'precision':precision_score(y_test,y_pred,zero_division=0), 'recall':recall_score(y_test,y_pred,zero_division=0), 'f1':f1_score(y_test,y_pred,zero_division=0)}\ndelivery = pd.DataFrame({'actual':y_test,'probability':p_test,'predicted':y_pred},index=y_test.index)\ndelivery.to_csv('week3_predictions.csv',index_label='sample_id')\nprint(best_name,best_threshold,test_report)\n",
+          "hints": [
+            "从第 2 题复制自己写的选择逻辑，再 fit 选中的 model。然后用验证概率而不是预测类别选择阈值。",
+            "第 6 天的阈值循环可以迁移过来；确定后只对测试集 predict_proba 一次，生成报告与 CSV。"
+          ],
+          "noteSection": "实验协议：训练选模型，验证选阈值，测试只验收"
+        }
+      ]
+    }
+  ]
+}

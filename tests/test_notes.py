@@ -32,13 +32,13 @@ class Examples(HTMLParser):
             self.examples[-1][1] += text
 
 
-def run(code):
+def run(code, checks=None):
     with tempfile.TemporaryDirectory() as folder:
         env = dict(os.environ, MPLCONFIGDIR=str(ROOT / '.data' / 'matplotlib'),
                    OPENBLAS_NUM_THREADS='1', OMP_NUM_THREADS='1')
         result = subprocess.run(
             [sys.executable, str(ROOT / 'runner.py')], cwd=folder, env=env,
-            input=json.dumps({'code': code, 'checks': []}),
+            input=json.dumps({'code': code, 'checks': checks or []}),
             capture_output=True, text=True, encoding='utf-8', timeout=35,
         )
         if result.returncode:
@@ -49,7 +49,7 @@ def run(code):
 class LessonRegressionTests(unittest.TestCase):
     def test_each_note_runs_without_an_earlier_session(self):
         count = 0
-        for filename in ('curriculum.json', 'week2.json'):
+        for filename in ('curriculum.json', 'week2.json', 'week3.json'):
             curriculum = json.loads((ROOT / 'dist' / filename).read_text(encoding='utf-8'))
             for day, lesson in enumerate(curriculum['days'], 1):
                 parser = Examples()

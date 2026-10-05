@@ -20,7 +20,7 @@ STATE=ROOT/'.data'/'progress.json'
 STATE.parent.mkdir(exist_ok=True)
 def load_tasks():
     tasks={}
-    for filename in ('curriculum_private.json','week2_private.json'):
+    for filename in ('curriculum_private.json','week2_private.json','week3_private.json'):
         path=ROOT/filename
         if path.exists():
             curriculum=json.loads(path.read_text(encoding='utf-8'))
@@ -95,13 +95,13 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if not self.allowed():return self.json_response({'error':'仅允许从本地练习页访问。'},403)
         path=urlparse(self.path).path
-        if path=='/api/config':return self.json_response({'token':TOKEN,'name':'ioai-week1','version':2})
+        if path=='/api/config':return self.json_response({'token':TOKEN,'name':'ioai-week1','version':3})
         if path=='/api/state':
             with STATE_LOCK:
                 try:data=json.loads(STATE.read_text(encoding='utf-8'))
                 except (FileNotFoundError,json.JSONDecodeError):data={}
             return self.json_response(data)
-        if path not in {'/','/index.html','/practice.html','/home.css','/home.js','/style.css','/app.js','/curriculum.json','/week2.json','/courses.json'}:return self.json_response({'error':'找不到页面'},404)
+        if path not in {'/','/index.html','/practice.html','/home.css','/home.js','/style.css','/app.js','/curriculum.json','/week2.json','/week3.json','/courses.json'}:return self.json_response({'error':'找不到页面'},404)
         return super().do_GET()
     def do_POST(self):
         global TASKS
@@ -119,13 +119,13 @@ class Handler(SimpleHTTPRequestHandler):
         except (ValueError,json.JSONDecodeError):return self.json_response({'error':'请求格式不正确'},400)
         if path=='/api/state':
             # Keep only the explicitly local learning data, with bounded field sizes.
-            if body.get('schemaVersion') != 2:
+            if body.get('schemaVersion') != 3:
                 return self.json_response({'error':'课程已更新，请刷新旧练习标签页后继续。旧标签页不会覆盖新进度。'},409)
-            clean={'schemaVersion':2,'week':1,'day':0,'task':0,'positions':{},'codes':{},'passed':{},'hints':{},'seen':{}}
-            if body.get('week') in (1,2):clean['week']=body['week']
+            clean={'schemaVersion':3,'week':1,'day':0,'task':0,'positions':{},'codes':{},'passed':{},'hints':{},'seen':{}}
+            if body.get('week') in (1,2,3):clean['week']=body['week']
             positions=body.get('positions',{})
             if isinstance(positions,dict):
-                for week in ('1','2'):
+                for week in ('1','2','3'):
                     pos=positions.get(week)
                     if isinstance(pos,dict) and type(pos.get('day'))==int and type(pos.get('task'))==int and 0<=pos['day']<=6 and 0<=pos['task']<=2:
                         clean['positions'][week]={'day':pos['day'],'task':pos['task']}
@@ -162,7 +162,7 @@ if __name__=='__main__':
         try:
             with urllib.request.urlopen(f'http://127.0.0.1:{PORT}/api/config',timeout=2) as response:
                 data=json.load(response)
-            if data.get('name')=='ioai-week1' and data.get('version')==2:
+            if data.get('name')=='ioai-week1' and data.get('version')==3:
                 print(f'练习网页已在运行：http://127.0.0.1:{PORT}',flush=True)
                 if '--open' in sys.argv:webbrowser.open(f'http://127.0.0.1:{PORT}')
                 sys.exit(0)
